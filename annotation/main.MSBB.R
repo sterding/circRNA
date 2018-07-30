@@ -47,28 +47,25 @@ Merge_circexp_norm<-sweep(Merge_circexp_raw,2,readsNum_million,"/")
 ############ filter cirRNAs     ###########
 ###########################################
 
-# What can be a good RPM cutoff?
-pdf("~/projects/circRNA/results/MSBB.filter_QC.pdf", width = 6, height = 5)
-boxplot(1/readsNum_million, outcol="NA", ylab="1 RPM cutoff for each sample"); 
-points(jitter(rep(1, length(readsNum_million))), 1/readsNum_million, pch=20, col=rgb(0,0,0,.6)) 
-dev.off()
+# Definition of being expression: with >=2 unique back-splicing reads in all samples (Zheng et al., doi:10.1038/ncomms11215)
+Merge_circexp_raw_filtered <- Merge_circexp_raw[rowSums(Merge_circexp_raw)>=2, ]
+Merge_circexp_norm_filtered <- Merge_circexp_norm[rowSums(Merge_circexp_raw)>=2, ]
+annotation_filtered <- annotation[annotation$ID %in% rownames(Merge_circexp_norm_filtered),] 
 
-RPM_threshold <- median(1/readsNum_million)
-raw_threshold <- 2
+dim(Merge_circexp_raw_filtered); dim(Merge_circexp_norm_filtered); dim(annotation_filtered)
+# [1] 65119   125
 
-## TRY-OUT method
-# # Definition #1 of being expression: with RPM >= threshold in >=2 samples
-# Merge_circexp_norm_filtered <- Merge_circexp_norm[rowSums(Merge_circexp_norm >= RPM_threshold) >= 2, ]
-# # Definition #2 of being expression: with >=2 unique back-splicing reads in all samples (Zheng et al., doi:10.1038/ncomms11215)
-# Merge_circexp_raw_filtered <- Merge_circexp_raw[rowSums(Merge_circexp_raw)>=2, ]
+# save
+saveRDS(Merge_circexp_raw_filtered, file="Merge_circexplorer_MSBB.filtered.rawcount.rds")
+saveRDS(Merge_circexp_norm_filtered, file="Merge_circexplorer_MSBB.filtered.normRPM.rds")
+saveRDS(annotation_filtered, file="Merge_circexplorer_MSBB.filtered.annotation.bed14.rds")
+
 
 ## Filter: expression of >CUTOFF RPM in at least 10 individuals and ≥6 reads in at least 10 individuals 
 # (like GTEx: https://www.gtexportal.org/home/documentationPage#staticTextAnalysisMethods)
 
 Merge_circexp_norm_filtered = Merge_circexp_norm[rowSums(Merge_circexp_norm >= RPM_threshold) >= 10 & rowSums(Merge_circexp_raw >= raw_threshold) >= 10, ]
 
-dim(Merge_circexp_norm_filtered)
-# [1] 12326   220
 
 pdf("~/projects/circRNA/results/MSBB.total_circRNA_raw_reads.pdf", width = 6, height = 5)
 layout(matrix(c(1,2), 1, 2, byrow = TRUE), widths=c(5,1), heights=c(1,1))
@@ -86,10 +83,10 @@ filtered_circRNA_raw_reads = rowSums(Merge_circexp_raw[rownames(Merge_circexp_no
 ht=hist(filtered_circRNA_raw_reads[filtered_circRNA_raw_reads<=200], breaks = 0:200, plot=F)
 points(log10(ht$counts+.1)+1, lwd=2, type='h',col='#ff0000')
 legend("topleft",c(paste(format(length(total_circRNA_raw_reads),big.mark=","),"distinct circular RNAs"),
-                        paste(format(nrow(Merge_circexp_norm_filtered),big.mark=","),"with >=", signif(RPM_threshold,2), "RPM and >=", raw_threshold, "reads in >=10 samples")),
+                   paste(format(nrow(Merge_circexp_norm_filtered),big.mark=","),"with >=", signif(RPM_threshold,2), "RPM and >=", raw_threshold, "reads in >=10 samples")),
        col=c('#aaaaaa','#ff0000'),
        text.col = c('#aaaaaa','#ff0000'),
-       bty='n')
+       bty='n', xpd=TRUE)
 
 ## for the 200- region
 par(mar=c(4,1,0,1))
@@ -108,10 +105,3 @@ ht=hist(filtered_circRNA_raw_reads[filtered_circRNA_raw_reads>200], breaks = 200
 points(log10(ht$counts+.1)+1, lwd=2,xlim=range(total_circRNA_raw_reads), type='h',col='#ff0000')
 
 dev.off()
-
-# save
-save(RPM_threshold, raw_threshold, Merge_circexp_raw,Merge_circexp_norm, Merge_circexp_norm_filtered, file="Merge_circexp.MSBB.Rdata")
-saveRDS(Merge_circexp_norm_filtered, file="Merge_circexp_norm_filtered.MSBB.rds")
-
-write.table(Merge_circexp_raw[rownames(Merge_circexp_norm_filtered),], file="Merge_circexplorer_MSBB.rawcount.filtered.txt", sep="\t", quote = F, row.names = F)
-write.table(annotation[annotation$ID %in% rownames(Merge_circexp_norm_filtered),], file="Merge_circexplorer_MSBB.annotation.filtered.bed14", sep="\t", quote = F, row.names = F)

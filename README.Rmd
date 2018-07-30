@@ -5,10 +5,6 @@ date: "October 27, 2016; May 30, 2017"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
 ## Introduction
 
 This is a short summary for the pipeline of circRNA analysis, including:
@@ -36,15 +32,15 @@ ran circExplorer on the 12 new samples (with RNaseR and mock, by Yunfei) and all
 
 Note from Rebeca: "`RNAseq.pipeline.mapsplice221.Braincode.sh` and `RNAseq.pipeline.mapsplice.sh` were the most finalized versions of the mapsplice code for Braincode and the RNaseR samples, but I was still getting many errors after days of running mapsplice. Mostly in files with high sequencing depth. I then decided to test either changing some parameters to make it more efficient (`RNAseq.pipeline.mapsplice221_canonical.sh`) or to subsample the files (`RNAseq.pipeline.mapsplice221.subsample.sh`) but I never got that to work and focused on analyzing only circexplorer results since those did run successfully for all samples. So the code I eventually used is `RNAseq.pipeline.sh` which only runs circexplorer." (from 20161027 email)
 
-Note: For the two midbrain samples (HC_MD6326_MB_M and HC_MD6326_MB_R), Xianjun used the braincode/RNAseq.pipeline.sh (rather the one in Rebeco's Code_Executables directory, as they seem the same). 2017/08/02
-
-Note: Rerun all samples using ~/pipeline/RNAseq.pipeline.sh with updated CIRCExplorer2 (rather the one in Rebeco's Code_Executables directory, as they seem the same). 2017/10/26
+Note: Rerun all samples using the modified version of gene reference (+CDR1as) (2017/10/28):
+For RM samples: $HOME/neurogen/circRNA_seq_Rebeca_HC/Code_Executables/pipeline/RNAseq/RNAseq.pipeline.sh /data/neurogen/circRNA_seq_Rebeca_HC/rawfiles
+For BC samples: $HOME/neurogen/pipeline/RNAseq/RNAseq.pipeline.sh /data/neurogen/rnaseq_PD/rawfiles
 
 **2. merge circRNA called from all RM samples**
 
 merge CircExplorer output files "circ.txt" to count circRNAs for several samples in one table.  
 
-```{r eval=FALSE}
+```{bash}
 ## all RM samples by Yunfei
 cd /data/neurogen/circRNA_seq_Rebeca_HC/
 mkdir RM_circexp
@@ -64,17 +60,17 @@ HC_WGC082370_FB_R_b1
 HC_WGC082371_FB_M_b1
 HC_WGC082372_PBMC_R_b1
 HC_WGC082373_PBMC_M_b1" > RM.samplelist 
-ls ~/neurogen/circRNA_seq_Rebeca_HC/run_output/*/circ.txt | grep -f RM.samplelist - | while read line; do i=${line/*run_output\//}; ii=${i/\/circ.txt/_candidates.bed}; echo $ii; ln -fs $line $ii; done
+ls ~/neurogen/circRNA_seq_Rebeca_HC/run_output/*/*circ.txt | grep -f RM.samplelist - | while read line; do i=${line/*run_output\//}; ii=${i/\/*circ.txt/_candidates.bed}; echo $ii; ln -fs $line $ii; done
 module load python/2.7.3
 python /data/neurogen/circRNA_seq_Rebeca_HC/Code_Executables/Merge_circRNA_tools/merge_circexplorer.py *candidates.bed | sed 's/WGC082362/MGH1026/;s/WGC082363/MGH1026/;s/WGC082364/MC3290/;s/WGC082365/MC3290/;s/WGC082366/TCKY1247/;s/WGC082367/TCKY1247/;s/WGC082368/TCKY1217/;s/WGC082369/TCKY1217/;s/WGC082370/ND34770/;s/WGC082371/ND34770/;s/WGC082372/H02018/;s/WGC082373/H02018/' > Merge_circexplorer_RM.rawcount.txt
 echo -e "chrom\tstart\tend\tID\tscore\tstrand\tthickStart\tthickEnd\titemRgb\texonCount\texonSizes\texonOffsets\tcircType\tgeneName" > Merge_circexplorer_RM.annotation.bed14
-awk -v OFS='\t' '{print $1,$2,$3,$1"_"$2"_"$3,1,$6,$7,$8,$9,$10,$11,$12,($14=="Yes")?"ciRNA":"circRNA",$15}' *_candidates.bed | sort -u >>  Merge_circexplorer_RM.annotation.bed14
+awk -v OFS='\t' '{print $1,$2,$3,$1"_"$2"_"$3,1,$6,$7,$8,$9,$10,$11,$12,($14=="Yes" || $14=="ciRNA")?"ciRNA":"circRNA",$15}' *_candidates.bed | sort -u >>  Merge_circexplorer_RM.annotation.bed14
 
 ```
 
 **3. merge circRNA called from all BC samples**
 
-```{r eval=FALSE}
+```{bash}
 ## HC only
 # cd /data/neurogen/circRNA_seq_Rebeca_HC/
 # mkdir BRAINCODE_circexp
@@ -90,19 +86,21 @@ awk -v OFS='\t' '{print $1,$2,$3,$1"_"$2"_"$3,1,$6,$7,$8,$9,$10,$11,$12,($14=="Y
 ## change to use all 106 samples (HC+ILB) in Fig. S1a
 cd /data/neurogen/circRNA_seq_Rebeca_HC/
 #mv BRAINCODE_circexp _BRAINCODE_circexp_rebeca; mkdir BRAINCODE_circexp  # backup of Rebeca's original result 
-cd BRAINCODE_circexp
+cd /data/neurogen/circRNA_seq_Rebeca_HC/BRAINCODE_circexp
 cat ~/neurogen/rnaseq_PD/results/merged/samplelist.HCILB_SNDA ~/neurogen/rnaseq_PD/results/merged/samplelist.HC_PY ~/neurogen/rnaseq_PD/results/merged/samplelist.HC_nonNeuron ~/neurogen/rnaseq_PD/results/merged/samplelist.PD_SNDA > BC.n125.samplelist
-ls ~/neurogen/rnaseq_PD/run_output/*/circ.txt | grep -f BC.n125.samplelist - | while read line; do i=${line/*run_output\//}; ii=${i/\/circ.txt/_candidates.bed}; echo $ii; ln -fs $line $ii; done
+cat ~/neurogen/rnaseq_PD/results/merged/samplelist.HCILB_SNDA ~/neurogen/rnaseq_PD/results/merged/samplelist.HC_PY ~/neurogen/rnaseq_PD/results/merged/samplelist.HC_nonNeuron > BC.n106.samplelist
+# update to use the output from CIRCexploer2
+ls ~/neurogen/rnaseq_PD/run_output/*/circularRNA_known.txt | grep -f BC.n125.samplelist - | while read line; do i=${line/*run_output\//}; ii=${i/\/circularRNA_known.txt/_candidates.bed}; echo $ii; ln -fs $line $ii; done
 module load python/2.7.3
 python /data/neurogen/circRNA_seq_Rebeca_HC/Code_Executables/Merge_circRNA_tools/merge_circexplorer.py *candidates.bed > Merge_circexplorer_BC.rawcount.txt
 echo -e "chrom\tstart\tend\tID\tscore\tstrand\tthickStart\tthickEnd\titemRgb\texonCount\texonSizes\texonOffsets\tcircType\tgeneName" > Merge_circexplorer_BC.annotation.bed14
-awk -v OFS='\t' '{print $1,$2,$3,$1"_"$2"_"$3,1,$6,$7,$8,$9,$10,$11,$12,($14=="Yes")?"ciRNA":"circRNA",$15}' *_candidates.bed | sort -u >>  Merge_circexplorer_BC.annotation.bed14
+awk -v OFS='\t' '{print $1,$2,$3,$1"_"$2"_"$3,1,$6,$7,$8,$9,$10,$11,$12,($14=="Yes" || $14=="ciRNA")?"ciRNA":"circRNA",$15}' *_candidates.bed | sort -u >>  Merge_circexplorer_BC.annotation.bed14
 ```
 
 
-**4. merge circRNA called from RM and BC samples**
+**4. merge circRNA called from RM and BC samples [optional] **
 
-```{r eval=F}
+```{bash}
 cd ~/projects/circRNA/data
 ln -fs ~/neurogen/circRNA_seq_Rebeca_HC/BRAINCODE_circexp/Merge_circexplorer_BC.annotation.bed14 Merge_circexplorer_BC.annotation.bed14
 ln -fs ~/neurogen/circRNA_seq_Rebeca_HC/BRAINCODE_circexp/Merge_circexplorer_BC.rawcount.txt Merge_circexplorer_BC.rawcount.txt
@@ -112,13 +110,18 @@ ln -fs ~/neurogen/circRNA_seq_Rebeca_HC/RM_circexp/Merge_circexplorer_RM.rawcoun
 cat Merge_circexplorer_BC.annotation.bed14 Merge_circexplorer_RM.annotation.bed14 | grep -v chrom | sort -u  >  Merge_circexplorer_BC_RM.annotation.bed14
 cut -f1,2,3,6,10,11,13,14 Merge_circexplorer_BC_RM.annotation.bed14 > concatenated_circOut_unique_BC_RM.txt
 
+# for UCSC 
+awk 'BEGIN{print "track name=Merge_circexplorer_BC_RM.annotation.bed14 visibility=2 colorByStrand=\"255,0,0 0,0,255\" useScore=1"}{OFS="\t";$5=($13=="circRNA")?1000:0;print}' Merge_circexplorer_BC_RM.annotation.bed14 | cut -f1-12 | gzip > Merge_circexplorer_BC_RM.annotation.forUCSCS.bed12.gz
+chmod 644 Merge_circexplorer_BC_RM.annotation.forUCSCS.bed12.gz;
+scp Merge_circexplorer_BC_RM.annotation.forUCSCS.bed12.gz xd010@panda.dipr.partners.org:~/public_html/tracks
+
 
 
 ```
 
 **5. total table, annotaton, and fold change**
 
-```{r eval=F}
+```{bash}
 cd ~/projects/circRNA/data
 # run the third part of ~/projects/circRNA/data/Files_Rebeca_borges/Circ_rnas_noOutliers.update.R or equally makeTotalTable.R
 Rscript makeTotalTable.R
@@ -140,6 +143,12 @@ Definition of "being cell-type specific":
 
 - in the specific tissue, specificity score S>=0.5 AND mean expression > mean+2s.d. of overall expression (Zheng et al., doi:10.1038/ncomms11215)
 
-## 3. eQTL analysis of circRNAs in SNDA samples
+## 3. eQTL analysis of circRNAs in SNDA samples ##
+
+Filter: 
+- expression of >0.001 RPM in at least 10% individuals and ≥1 reads in at least 10% individuals 
+
+
+
 ## 4. allele-specific circularization
 ## 5. disease/trait GWAS enrichment
