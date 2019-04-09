@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # align FASTQ using STAR and then call circRNA using CIRCExplore
+# Note: this works for datasets: MSBB
 # Aug 18, 2017
 # Modified by XD
 # Usage: 

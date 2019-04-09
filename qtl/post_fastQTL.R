@@ -5,20 +5,18 @@ library(qvalue)
 
 args<-commandArgs(TRUE)
 prefix=args[1] 
-#prefix='cQTL'
+# prefix='eQTLcircRNA'
 
 q_cutoff=0.05
-
-setwd("~/projects/circRNA/data/QTL_BC")
 
 permutation_file=paste0(prefix,".permutations.txt.gz")
 D = read.table(permutation_file, head=F, stringsAsFactors=F)
 colnames(D) = c("gene_id", "num_var", "beta_shape1", "beta_shape2", "dummy", "variant_id", "dist", "pval_nominal", "slope","pval_perm", "pval_beta")
 
-# remove genes w/o variants
+# remove genes w/o variation
 nanrows <- is.na(D[, 'pval_beta'])
 D <- D[!nanrows, ]
-cat("  * Number of genes tested: ", nrow(D), " (excluding ", sum(nanrows), " genes w/o variants)\n", sep="")
+cat("  * Number of genes tested: ", nrow(D), " (excluding ", sum(nanrows), " genes w/o variation)\n", sep="")
 cat("  * Correlation between Beta-approximated and empirical p-values: ", round(cor(D[, 'pval_perm'], D[, 'pval_beta']), 4), "\n", sep="")
 
 pdf(paste0(prefix,".QC.correlation.pdf"), width=5, height = 5)
@@ -42,7 +40,7 @@ cat("  * eGenes @ FDR ", q_cutoff, ":   ", sum(D$qval<q_cutoff), "\n", sep="")
 # determine global min(p) significance threshold and calculate nominal p-value threshold for each gene
 ub <- sort(D[D$qval >= q_cutoff, 'pval_beta'])[1]  # smallest p-value above FDR
 lb <- -sort(-D[D$qval <= q_cutoff, 'pval_beta'])[1]  # largest p-value below FDR
-pthreshold <- (lb+ub)/2
+pthreshold <- mean(c(ub, lb), na.rm = T)
 cat("  * min p-value threshold @ FDR ", q_cutoff, ": ", pthreshold, "\n", sep="")
 D$pval_nominal_threshold <- signif(qbeta(pthreshold, D$beta_shape1, D$beta_shape2, ncp=0, lower.tail=TRUE, log.p=FALSE), 6)
 

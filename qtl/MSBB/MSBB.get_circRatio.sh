@@ -26,12 +26,14 @@ awk '{OFS="\t"; s=($6=="+")?$2:$3; e=($6=="+")?$3:$2; if(NR>1) {print $1,s-1,s+1
 ##========================================================================
 # 2. get the linear spliced and unspliced reads on the two ends of circRNA: s3+s5+u3+u5
 ##========================================================================
-for i in ~/neurogen/ROSMAP/MSBB/rnaseq_runoutput/*out.bam; do
+## Note: *sorted* input bam files are required. So, either change STAR option "--outSAMtype BAM SortedByCoordinate" or sort bam with samtools sort
+## cd ~/neurogen/AMPAD/MSBB/rnaseq_runoutput/; for i in `find *.Aligned.out.bam -mtime -365 -mtime +2`;  do echo $i; bsub -q short -n 3 -J `basename $i .Aligned.out.bam` "samtools sort -m 2G -@ 3 -o $i.sorted $i; mv $i.sorted $i; samtools index $i;"; done
+for i in ~/neurogen/AMPAD/MSBB/rnaseq_runoutput/*out.bam; do
   sampleName=`echo $i | sed 's/.*output\/\(.*\)\..*Aligned.*/\1/g'`
-  #[ -s $circRNA_annotation.sum_u3u5s3s5.$sampleName ] || bsub -q short -n 1 -R "rusage[mem=2000]" -J $sampleName "module load bedtools/2.26.0; bedtools multicov -split -bams $i -bed $circRNA_annotation.2ntAtEnds.bed | sort -k4,4 | ~/bin/bedtools223 groupby -g 4 -c 5 -o sum > $circRNA_annotation.sum_u3u5s3s5.$sampleName"
-  [ -s $circRNA_annotation.sum_u3u5s3s5.$sampleName ] || bsub -q normal -n 1 -R "rusage[mem=1000]" -J $sampleName "module load bedtools/2.26.0; bedtools coverage -split -b $i -a $circRNA_annotation.2ntAtEnds.bed -sorted -counts -g hg19.hms.genome | sort -k4,4 | ~/bin/bedtools223 groupby -g 4 -c 5 -o sum > $circRNA_annotation.sum_u3u5s3s5.$sampleName"
+  [ -s $circRNA_annotation.sum_u3u5s3s5.$sampleName ] || bsub -q big-multi -n 4 -M 8000 -J $sampleName "module load bedtools/2.26.0; bedtools coverage -split -b $i -a $circRNA_annotation.2ntAtEnds.bed -sorted -counts -g hg19.hms.genome | LC_ALL=C sort -k4,4 --parallel=4 --buffer-size=1G | ~/bin/bedtools223 groupby -g 4 -c 5 -o sum > $circRNA_annotation.sum_u3u5s3s5.$sampleName"
 done
-# merge all together
+# merge all together, for individual tissue
+cd MSBB.frontal_pole
 echo "geneID" `ls $circRNA_annotation.sum_u3u5s3s5.* | sed 's/.*3u5s3s5.//g' | rowsToCols stdin stdout` > header
 tmp=$(mktemp)
 tmp2=$(mktemp)

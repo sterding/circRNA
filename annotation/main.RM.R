@@ -54,6 +54,7 @@ Merge_circexp_raw_RM_ttest= ungroup(Merge_circexp_raw_long) %>%
   summarise(M = list(M), R=list(R)) %>%
   group_by(name) %>%
   mutate(pvalue=t.test(R[[1]], M[[1]], alternative ='greater', paired =T)$p.value,
+         pvalue.u=wilcox.test(R[[1]], M[[1]], alternative ='greater', paired =T)$p.value,
          log2FoldChange=log2((sum(R[[1]])+1)/(sum(M[[1]])+1)),
          symbol=annotation$geneName[match(name, annotation$ID)],
          meanR=mean(R[[1]])) 

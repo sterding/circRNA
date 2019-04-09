@@ -19,7 +19,8 @@ wd=paste0("~/projects/circRNA/results/eQTL/",SAMPLE_GROUP);
 if(!file.exists(wd)) dir.create(wd, recursive =T);
 setwd(wd)
 
-samplelist=read.table(paste0("~/neurogen/rnaseq_PD/results/merged/samplelist.",SAMPLE_GROUP), header = F, stringsAsFactors = FALSE)[,1]
+#samplelist=read.table(paste0("~/neurogen/rnaseq_PD/results/merged/samplelist.",SAMPLE_GROUP), header = F, stringsAsFactors = FALSE)[,1]
+samplelist=scan("~/neurogen/rnaseq_PD/results/merged/samplelist.HCILB_SNDA84",character())
 covarianceTableURL="https://docs.google.com/spreadsheets/d/1I8nRImE9eJCCuZwpjfrrj-Uwx9bLebnO6o-ph7u6n8s/pub?gid=195725118&single=true&output=tsv"  # for all 140 samples
 
 snps_file="~/neurogen/genotyping_PDBrainMap/eQTLMatrixBatch123/All.Matrix.txt";  # 91 unique subjects 
@@ -30,8 +31,7 @@ if(file.exists("data.RData")) load("data.RData") else{
   
   message("## loading expression data...")
   ######################
-  load("~/projects/circRNA/data/Merge_circexp.BC.Rdata")
-  expr = Merge_circexp_norm_filtered
+  expr = readRDS("~/projects/circRNA/data/Merge_circexplorer_BC106.filtered.enriched.normRPM.rds")
   
   message(" # remove outlier and replicate...")
   ######################
@@ -40,6 +40,25 @@ if(file.exists("data.RData")) load("data.RData") else{
   covs=covs[match(common, covs$sampleName), ]
   expr=subset(expr, select = common)
 
+  message(paste(" -- now expression matrix has",nrow(expr),"rows and",ncol(expr),"columns"))
+  
+  message(" # filtering expression data...") # unnecessary as the input is already filtered
+  ######################
+  ## Filter: expression of >0.001 RPM in at least 5% individuals and ≥1 reads in at least 5% individuals 
+  # (similar as GTEx: https://www.gtexportal.org/home/documentationPage#staticTextAnalysisMethods)
+  
+  RPM_threshold = 0.001
+  raw_threshold = 1
+  PERCENT_CUTOFF = 0.05
+  
+  expr_raw = readRDS("~/projects/circRNA/data/Merge_circexplorer_BC106.filtered.enriched.rawcount.rds")
+  
+  expr = expr[rowMeans(expr >= RPM_threshold) >= PERCENT_CUTOFF & rowMeans(expr_raw[,names(expr)] >= raw_threshold) >= PERCENT_CUTOFF, ]
+  # n = 601 remained for downstream QTL analysis
+  
+  message(paste(" -- now expression matrix has",nrow(expr),"rows and",ncol(expr),"columns"))
+  #  -- now expression matrix has 601 rows and 84 columns
+
   # change the sample ID to subject ID
   colnames(expr)=gsub(".*_(.*)_.*_.*_rep.*", "\\1", colnames(expr))
   
@@ -47,16 +66,6 @@ if(file.exists("data.RData")) load("data.RData") else{
   covs$batch = as.factor(covs$batch)
   covs$sex = as.factor(covs$sex)
   covs$readsLength = as.factor(covs$readsLength)
-  
-  message(paste(" -- now expression matrix has",nrow(expr),"rows and",ncol(expr),"columns"))
-  
-  # message(" # filtering expression data...") # unnecessary as the input is already filtered
-  # ######################
-  # # remove genes with 0 in >=90% of samples
-  # # expr=expr[rowMeans(expr==0)<0.9, ]
-  # # GTEx: Filter on >=10 individuals having >0.1 RPKM.
-  # expr=expr[rowMeans(expr>0.1)>=10,]  # 51506 --> 32642 remained
-  # message(paste(" -- now expression matrix has",nrow(expr),"rows and",ncol(expr),"columns"))
   
   message(" # transforming RPKM to rank normalized gene expression ...")
   ######################
@@ -83,11 +92,11 @@ if(file.exists("data.RData")) load("data.RData") else{
     saveRDS(snps,file = "snps.rds")
   }
   # extract the samples with both RNAseq and genotyped, and reorder both snps and expression
-  common = intersect(colnames(snps), colnames(expr))
+  common = intersect(MatrixEQTL::colnames(snps), colnames(expr))
   
   message(paste0("# Fianl number of samples for eQTL: N=", length(common)));
   
-  snps$ColumnSubsample(match(common, colnames(snps)))
+  snps$ColumnSubsample(match(common, MatrixEQTL::colnames(snps)))
   expr=expr[,common];
   covs=covs[match(common, covs$subjectID), ]
   #rownames(covs)=covs$subjectID; # this one can 
@@ -265,5 +274,7 @@ dev.off()
 genesnp=read.table("final.cis.eQTL.xls", header=T, stringsAsFactors = FALSE)
 genesnp=cbind(genesnp, SNP.pos=snpspos[match(genesnp$SNP, snpspos$snp),'pos'], SNP.chr=snpspos[match(genesnp$SNP, snpspos$snp),'chr'])
 write.table(genesnp, file="final.cis.eQTL.xls", sep="\t", col.names = T,quote=FALSE, row.names=FALSE)
+write.table(subset(genesnp, FDR<=0.05), file="final.cis.eQTL.FDR.05.xls", sep="\t", col.names = T,quote=FALSE, row.names=FALSE)
 
 message(paste("eQTL analysis is done and found", me$cis$neqtls,"cis SNP-gene pairs with significance p<1e-2."))
+message(paste("eQTL analysis is done and found", sum(genesnp$FDR<0.05),"cis SNP-gene pairs with FDR<0.05."))

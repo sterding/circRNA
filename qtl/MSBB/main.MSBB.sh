@@ -19,7 +19,7 @@ for i in *bed; do echo $i; bgzip -f $i && tabix -f -p bed $i.gz; done
 ## PCI
 cd ~/projects/circRNA/MSBB/
 #1. run STAR --> circExplorer --> circ.txt in each run_output folder (done)
-for i in Fastq/*gz; do sample=`basename $i .accepted_hits.sort.coord.combined.fastq.gz`; [ ! -s outputs/$sample/circ.txt_circ.txt ] && bsub -q mcore -n 4 -W 12:00 -J $sample -R "rusage[mem=10000]" bash run-star.sh $i; done
+for i in Fastq/*/*gz; do sample=`basename $i .accepted_hits.sort.coord.combined.fastq.gz`; [ ! -s outputs/$sample/circ.txt_circ.txt ] && bsub -q mcore -n 4 -W 12:00 -J $sample -R "rusage[mem=10000]" bash run-star.sh $i; done
 #2. merge all circ.txt into one big matrix of circ expression, only for samples with Genotype+phrenotyp
 mkdir phenotypes/circexplorer; cd phenotypes/circexplorer;
 ls ~/projects/circRNA/MSBB/run_output/*/*circ.txt | grep -f <(cut -f3 ~/projects/circRNA/MSBB/Samples_hasGenoExpr.ID.DNA.RNA.tab) - | while read line; do i=${line/*\//}; ii=${i/circ.txt/candidates.bed}; echo $ii; ln -fs $line $ii; done
