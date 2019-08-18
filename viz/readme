@@ -1,0 +1,25 @@
+# vcf file
+cat ~/neurogen/rnaseq_PD/results/merged/samplelist.HCILB_SNDA  ~/neurogen/rnaseq_PD/results/merged/samplelist.HC_PY ~/neurogen/rnaseq_PD/results/merged/samplelist.HC_nonNeuron  | awk '{OFS="\t"; split($1,a,"_"); print $1, (a[3]=="SNDA")?"0|0:0:1,0,0":((a[3]~"PY")?"0|1:1:0,1,0":"1|1:2:0,0,1")}' | rowsToCols stdin stdout
+bgzip cellType.vcf
+tabix -p vcf cellType.vcf.gz
+
+# circRNA raw count
+head ~/projects/circRNA/data/Merge_circexplorer_BC106.rawcount.xls -n1 > RIMS2.circRNA.rawcount.txt
+grep _73043538 ~/projects/circRNA/data/Merge_circexplorer_BC106.rawcount.xls >> RIMS2.circRNA.rawcount.txt 
+
+# make bam files
+# multiple mappers
+cat ~/neurogen/rnaseq_PD/results/merged/samplelist.HCILB_SNDA  ~/neurogen/rnaseq_PD/results/merged/samplelist.HC_PY ~/neurogen/rnaseq_PD/results/merged/samplelist.HC_nonNeuron | while read i; do echo $i; samtools view -b -o bam/RIMS1.$i.bam ~/neurogen/rnaseq_PD/run_output/$i/accepted_hits.bam chr6:72550000-73150000; samtools index bam/RIMS1.$i.bam; done
+# unique mappers
+cat ~/neurogen/rnaseq_PD/results/merged/samplelist.HCILB_SNDA  ~/neurogen/rnaseq_PD/results/merged/samplelist.HC_PY ~/neurogen/rnaseq_PD/results/merged/samplelist.HC_nonNeuron | while read i; do echo $i; samtools view -b -o bam/RIMS1.$i.bam ~/neurogen/rnaseq_PD/run_output/$i/uniq/accepted_hits.bam chr6:72550000-73150000; samtools index bam/RIMS1.$i.bam; done
+
+#make mapping file
+>map_file.RIMS1.txt; cat ~/neurogen/rnaseq_PD/results/merged/samplelist.HCILB_SNDA  ~/neurogen/rnaseq_PD/results/merged/samplelist.HC_PY ~/neurogen/rnaseq_PD/results/merged/samplelist.HC_nonNeuron | while read i; do echo $i test_files/bam/RIMS1.$i.bam >> map_file.RIMS1.txt; done
+
+# to getnerate pickle file
+python initialize_data.py chr4:90642199 chr6:72550000-73150000 --vcf test_files/cellType.vcf.gz --gtf test_files/RIMS1.gtf --mf test_files/map_file.RIMS1.txt --circ test_files/RIMS1.circRNA.rawcount.txt --output test_files
+# to make plot
+python plot.py test_files/chr4:90642199@chr6:72550000-73150000.p pickle settings_file
+
+python initialize_data.py chr4:90642199 chr6:72991160-73054014 --vcf test_files/cellType.vcf.gz --gtf test_files/RIMS1.gtf --mf test_files/map_file.RIMS1.txt --circ test_files/RIMS1.circRNA.rawcount.txt --output test_files
+python plot.py test_files/chr4:90642199@chr6:72991160-73054014.p pickle settings_file

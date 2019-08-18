@@ -9,10 +9,11 @@ output: html_document
 
 This is a short summary for the pipeline of circRNA analysis, including:
 
-### Paper1: Dopamine neuron-specific circRNAs are indicative of Lewy-body intensity
-1. circRNA detection in BC samples 
-2. cell-type specific expression of circRNAs (SN, PY, FB, PBMC)
-3. PD (N=22) vs. ILB (N=28) vc. HC (N=77) circRNAs
+### Paper1: Circular RNAs in human brain neurons of neurodegenerative diseases
+1. circRNA detection in >200 brain samples (SNDA: 117; TCPY: 94; MCPY: 3; NN: 8)
+2. cell-type specific expression of circRNAs (SNDA, TCPY, FB, PBMC)
+3. PD (N=22) vs. ILB (N=28) vc. HC (N=67) SNDA circRNAs  --> validated in CFS (PD vs. HC)
+4. AD (N=44) vc. HC (N=50) TCPY circRNAs --> detected in CSF (HC)
 
 ### Paper2: Genetic effects on the expression, splicing and circularization of circRNAs
 4. eQTL analysis of circRNAs in SNDA samples

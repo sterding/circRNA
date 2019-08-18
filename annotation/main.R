@@ -1,11 +1,15 @@
 ## Main script to work on the output of circExplorer
 library('dplyr')
 library('reshape2')
+library('tidyverse')
+library('ggpubr') # install.packages("ggpubr")
 setwd("~/projects/circRNA/data/") 
 
 ## See ~/projects/circRNA/src/README.Rmd for how to generate the input files: 
 # Merge_circexplorer_BC.annotation.bed14
 # Merge_circexplorer_BC.rawcount.txt
+
+## see pilot.R in ~/Dropbox/grant/2019R21/pilot.R to make figure for pilot study (for grant purpose)
 
 ###########################################
 ################# load data  ##############
@@ -103,8 +107,13 @@ dim(Merge_circexp_raw_filtered); dim(Merge_circexp_norm_filtered); dim(annotatio
 saveRDS(Merge_circexp_raw_filtered, file="Merge_circexplorer_BC106.filtered.rawcount.rds")
 saveRDS(Merge_circexp_norm_filtered, file="Merge_circexplorer_BC106.filtered.normRPM.rds")
 saveRDS(annotation_filtered, file="Merge_circexplorer_BC106.filtered.annotation.bed14.rds")
+write.table(annotation_filtered, file="Merge_circexplorer_BC106.filtered.annotation.bed14", sep = "\t", quote = F, row.names = F, col.names = F)
 
+Merge_circexp_raw=readRDS(file="Merge_circexplorer_BC106.rawcount.rds")
+Merge_circexp_norm=readRDS(file="Merge_circexplorer_BC106.normRPM.rds")
 Merge_circexp_raw_filtered=readRDS(file="Merge_circexplorer_BC106.filtered.rawcount.rds")
+Merge_circexp_norm_filtered=readRDS(file="Merge_circexplorer_BC106.filtered.normRPM.rds")
+annotation_filtered=readRDS(file="Merge_circexplorer_BC106.filtered.annotation.bed14.rds")
 head(Merge_circexp_raw_filtered)
 Merge_circexp_raw_filtered %>% mutate(rowsum_SNDA=rowSums(select(.,contains("_SNDA_")))) %>% filter(rowsum_SNDA>0) %>% dim()
 
@@ -117,6 +126,9 @@ Merge_circexp_raw_filtered %>% mutate(rowsum_SNDA=rowSums(select(.,contains("_SN
 Merge_circexp_raw_long_enriched.RM  = readRDS(file="Merge_circexp_raw_long_filterd.RM.rds")
 length(unique(Merge_circexp_raw_long_enriched.RM$name))
 # [1] 48016
+table(unique(Merge_circexp_raw_long_enriched.RM$name[Merge_circexp_raw_long_enriched.RM$sampleGroup3!='NN']) %in% rownames(Merge_circexp_raw_filtered))
+# FALSE  TRUE 
+# 28793  9206
 
 Merge_circexp_norm_filtered_and_enriched=Merge_circexp_norm[intersect(rownames(Merge_circexp_raw_filtered), Merge_circexp_raw_long_enriched.RM$name), ]
 Merge_circexp_raw_filtered_and_enriched <- Merge_circexp_raw[rownames(Merge_circexp_norm_filtered_and_enriched), ]
@@ -130,8 +142,10 @@ dim(Merge_circexp_norm_filtered_and_enriched); dim(Merge_circexp_raw_filtered_an
 saveRDS(Merge_circexp_raw_filtered_and_enriched, file="Merge_circexplorer_BC106.filtered.enriched.rawcount.rds")
 saveRDS(Merge_circexp_norm_filtered_and_enriched, file="Merge_circexplorer_BC106.filtered.enriched.normRPM.rds")
 saveRDS(annotation_filtered_enriched, file="Merge_circexplorer_BC106.filtered.enriched.annotation.bed14.rds")
+annotation_filtered_enriched=readRDS(file="Merge_circexplorer_BC106.filtered.enriched.annotation.bed14.rds")
+write.table(annotation_filtered_enriched, file="Merge_circexplorer_BC106.filtered.enriched.annotation.bed14", sep = "\t", quote = F, row.names = F, col.names = F)
 
-###########################################
+#########################################
 ## Figure 1b: distribution of circRNAs supported by different number of reads
 ###########################################
 
@@ -199,65 +213,29 @@ points(log10(ht$counts+.1)+1, lwd=2, type='h',col='#ff0000')
 
 dev.off()
 
+## add gene highlight in the figure
+annotation_filtered_enriched %>% select(ID, circType, geneName) %>% 
+  left_join(rownames_to_column(Merge_circexp_raw_filtered_and_enriched), by = c("ID"="rowname")) %>% 
+  mutate(sumVar = rowSums(select(., contains("_")))) %>% select(-contains("_")) %>% 
+  filter(circType=='circRNA') %>% arrange(-sumVar) %>% 
+  #filter(sumVar<=200, sumVar>150)
+  filter(geneName %in% c("SORL1", "DNAJC6","PSEN1","APP", "SNCA","LRRK2","PINK1","RIMS2","ABCA7","CLU","CR1","PICALM","PLD3","TREM2",'PARK7', 'PRKN', 'GBA', 'UCHL1','SRY'))
 
-# ################################################### 
-# ## For grant: subset of 20 samples as pilot study
-# ###################################################
-# Merge_circexp_raw0=Merge_circexp_raw; readsNum_million0=readsNum_million;
-# set.seed(42); sample20=sample(sample106, 20); sample20
-# readsNum_million=readsNum_million[sample20]
-# Merge_circexp_raw=Merge_circexp_raw[,sample20]
-# Merge_circexp_raw=Merge_circexp_raw[rowSums(Merge_circexp_raw)>0,]; dim(Merge_circexp_raw)
-# #[1] 59571    20
-# Merge_circexp_norm<-sweep(Merge_circexp_raw,2,readsNum_million,"/")
-# Merge_circexp_raw_filtered <- Merge_circexp_raw[rowSums(Merge_circexp_raw)>=2, ]
-# Merge_circexp_norm_filtered <- Merge_circexp_norm[rowSums(Merge_circexp_raw)>=2, ]
-# 
-# total_circRNA_raw_reads = rowSums(Merge_circexp_raw)
-# 
-# pdf("~/projects/circRNA/results/total_circRNA_raw_reads.BC20.pdf", width = 6, height = 5)
-# layout(matrix(c(1,2), 1, 2, byrow = TRUE), widths=c(5,1), heights=c(1,1))
-# ht=hist(total_circRNA_raw_reads[total_circRNA_raw_reads<=200], breaks = 0:200, plot=F)
-# par(mar=c(4,4,0,1))
-# plot(log10(ht$counts+.1)+1, lwd=2,xlim=c(0,200), type='h', ylim = c(0.9,6.6),col=c("#000000",rep('#ff0000',199)), ylab='Number of circular RNAs', xlab="Number of backspliced reads",yaxt="n",xaxs="i", yaxs="i",bty="n")
-# y1=floor(range(log10(ht$counts+.1)+1))
-# pow <- seq(y1[1], y1[2])
-# ticksat <- as.vector(sapply(pow-1, function(p) log10((2:9)*10^p)))
-# axis(2, pow, labels = 10^(pow-1), las=1)
-# axis(2, ticksat, labels=NA, tcl=-0.25, lwd=0, lwd.ticks=1)
-# # add the remained ones with the #2 filter
-# filtered_circRNA_raw_reads = rowSums(Merge_circexp_raw[rownames(Merge_circexp_raw_filtered),])
-# ht=hist(filtered_circRNA_raw_reads[filtered_circRNA_raw_reads<=200], breaks = 0:200, plot=F)
-# points(log10(ht$counts+.1)+1, lwd=2, type='h',col='#ff0000')
-# legend("topleft",c(paste0("Distinct circular RNAs (n = ",format(length(total_circRNA_raw_reads),big.mark=","),")"),
-#                    paste0("+ at least 2 reads in overall samples (n = ", format(sum(total_circRNA_raw_reads>1),big.mark=","),")")),
-#        col=c("#000000",'#ff0000'),
-#        text.col = c("#000000",'#ff0000'),
-#        bty='n', xpd=T)
-# ## for the 200- region
-# par(mar=c(4,1,0,1))
-# total_circRNA_raw_reads = rowSums(Merge_circexp_raw)
-# MAX=max(total_circRNA_raw_reads)
-# ht=hist(total_circRNA_raw_reads[total_circRNA_raw_reads>200], breaks = 200:MAX, plot=F)
-# plot(log10(ht$counts+.1)+1, lwd=2,xlim=range(total_circRNA_raw_reads), type='h', ylim = c(0.9,6.5),col='#ff0000', ylab="",xlab="",xaxt="n",yaxt='n',xaxs="i", yaxs="i",bty="n")
-# y1=floor(range(log10(ht$counts+.1)+1))
-# pow <- seq(y1[1], y1[2])
-# ticksat <- as.vector(sapply(pow-1, function(p) log10((2:9)*10^p)))
-# #axis(2, pow, labels = 10^(pow-1), las=1)
-# #axis(2, ticksat, labels=NA, tcl=-0.25, lwd=0, lwd.ticks=1)
-# axis(1, c(0,seq(2000,MAX,5000)-200), labels=c(200,seq(2000,MAX,5000)))
-# # add the remained ones with the #2 filter
-# filtered_circRNA_raw_reads = rowSums(Merge_circexp_raw[rownames(Merge_circexp_norm_filtered),])
-# ht=hist(filtered_circRNA_raw_reads[filtered_circRNA_raw_reads>200], breaks = 200:MAX, plot=F)
-# points(log10(ht$counts+.1)+1, lwd=2,xlim=range(total_circRNA_raw_reads), type='h',col='#ff0000')
-# dev.off()
+## ===============================================
+## back-splicing reads vs. sample fraction
+## similar to Fig. 3E in https://www-sciencedirect-com.ezp-prod1.hul.harvard.edu/science/article/pii/S0092867418316350?via%3Dihub#fig3
+## ===============================================
+Merge_circexp_raw_filtered_and_enriched=readRDS("Merge_circexplorer_BC106.filtered.enriched.rawcount.rds")
+dim(Merge_circexp_raw_filtered_and_enriched)
+df=Merge_circexp_raw_filtered_and_enriched
+plot(jitter(rowMeans(df>0)), jitter(rowMeans(df)), pch=20, col='#00000033')
+## only few circRNAs expressed in 90% samples in our case. So, it's applicable to divide into 'high' vs. 'low' like the paper above. 
 
 ## ===============================================
 ## Number of circRNAs per host gene
 ## ===============================================
 require(scales)
-mylog_trans <- 
-  function (base = exp(1), from = 0) 
+mylog_trans <- function (base = exp(1), from = 0) 
   {
     trans <- function(x) log(x, base) - from
     inv <- function(x) base^(x + from)
@@ -273,6 +251,59 @@ ggplot(annotation_filtered_enriched_n, aes(x=n, y=N)) +
   scale_y_continuous(trans = mylog_trans(base=10, from=-1), breaks=c(1,10,100,1000),limits=c(0.1,1500)) +
   scale_x_continuous(breaks=pretty_breaks())
 dev.off()
+
+## vs. # of exon per host genes
+longestTx_annotation=read.table("~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/Genes/gencode.v19.annotation.longestTx.bed12", header = F, col.names = c('chr','start','end','ID','score','strand','gstart','gend','rgb','nExon','lengths','starts'), check.names = F, stringsAsFactors=F)
+longestTx_annotation = separate(longestTx_annotation, ID,c('geneName','ensID',NA,NA),sep='___')
+annotation_filtered_enriched$nExon=longestTx_annotation$nExon[match(annotation_filtered_enriched$geneName, longestTx_annotation$geneName)]
+head(annotation_filtered_enriched)
+# remove NA case caused by inconsistance between RefSeq and GENCODE gene symbol
+annotation_filtered_enriched %>% filter(!is.na(nExon), circType=='circRNA') %>% group_by(geneName) %>% summarise(nExon=mean(nExon), nCircRNA=n()) %>% ungroup() %>% group_by(nExon_interval=cut(nExon, breaks = c(0,10,20,30,40,1000))) %>% ggplot(aes(nExon_interval,nCircRNA)) + geom_boxplot() + theme_classic() + ggsave("Merge_circexplorer_BC106.filtered.enriched.nCircRNA.vs.nExon.pdf", width = 3, height = 3)
+
+## ===============================================
+## exon and flanking intron length of circRNAs vs. all exons
+## ===============================================
+annotation_filtered_enriched=readRDS(file="Merge_circexplorer_BC106.filtered.enriched.annotation.bed14.rds") %>% filter(circType=='circRNA') %>% select(1:12)
+introns=read.table("~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/Genes/introns.meta.bed", header = F, col.names = c('chr','start','end','ID','score','strand'), check.names = F, stringsAsFactors=F) %>% mutate(score=end-start) %>% unite("chrend",c("chr",'end'), remove =F) %>% unite("chrstart",c("chr",'start'), remove =F)
+head(introns)
+controls=read.table("Merge_circexplorer_BC.annotation.bed14.matched2", header = F, col.names = c('chrom','start','end','ID','score','strand','thickStart','thickEnd','itemRgb','exonCount','exonSizes','exonOffsets','exonindex','hostgene','matchedCircRNA'), stringsAsFactors = F) %>% filter(matchedCircRNA %in% annotation_filtered_enriched$ID) %>% select(1:12) %>% mutate(itemRgb='0,0,0')
+head(controls)
+head(annotation_filtered_enriched)
+
+# flanking intron lenth comparsion between called circRNAs and controls
+df=bind_rows(mutate(annotation_filtered_enriched,type="circRNA"),mutate(controls,type="control")) %>% 
+  unite('left_intron', c("chrom", "start"), remove =F) %>% 
+  unite('right_intron', c("chrom", "end"), remove =F) %>% 
+  mutate(left_intron_length=introns$score[match(left_intron, introns$chrend)], 
+         right_intron_length=introns$score[match(right_intron, introns$chrstart)]) %>% 
+  rowwise() %>% mutate(mean_intron_length=mean(c(left_intron_length,right_intron_length), na.rm = T))  
+ggplot(df,aes(x=type, y=mean_intron_length, col=type)) + geom_boxplot() + scale_y_log10() + theme_classic() + 
+  ggtitle(paste("Wilcox test P value =",signif(wilcox.test(mean_intron_length ~ as.factor(type), df)$p.value,2))) +
+  scale_color_manual(guide=FALSE, name="type",values=c("circRNA"="red","control" = "grey"))  
+ggsave("../results/Merge_circexplorer_BC106.filtered.enriched.annotation.lengthDistribution.flankingIntron.pdf", width = 2,height = 3)
+
+# single-exon circRNAs lenth vs. random exon controls
+exons=read.table("~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/Genes/exons.meta.bed", sep="\t", col.names = c("chrom","start","end","ID","score","strand"), stringsAsFactors = F, header = F) %>% filter(grepl("protein_coding", ID)) %>% select(1:3) %>% sample_n(5000) %>% mutate(type="background")
+df=readRDS(file="Merge_circexplorer_BC106.filtered.enriched.annotation.bed14.rds") %>% 
+  filter(exonCount==1, circType=='circRNA') %>% select(1:3) %>% mutate(type="circRNA") %>% bind_rows(exons) %>%
+  mutate(exon_length=end-start)
+ggplot(df, aes(x=type, y=exon_length, col=type)) + geom_boxplot() + scale_y_log10() + theme_classic() + 
+  ggtitle(paste("Wilcox test P value =",signif(wilcox.test(exon_length ~ as.factor(type), df)$p.value,2))) +
+  scale_color_manual(guide=FALSE, name="type",values=c("circRNA"="red","background" = "grey")) 
+ggsave("../results/Merge_circexplorer_BC106.filtered.enriched.annotation.lengthDistribution.single-exon-circRNAs.pdf", width = 2,height = 3)
+
+# region length distribution
+readRDS(file="Merge_circexplorer_BC106.filtered.enriched.annotation.bed14.rds") %>% 
+  ggplot(aes(x=end-start, fill=factor(circType, levels=c('ciRNA', 'circRNA')))) + 
+  geom_histogram(position = 'stack',bins = 60)  + scale_color_brewer(palette="Dark2") + 
+  theme_minimal()+theme_classic()+theme(legend.position="top")+ 
+  scale_x_log10() + scale_fill_manual(name="circular RNA types",values=c("circRNA"="red","ciRNA" = "orange")) 
+ggsave("../results/Merge_circexplorer_BC106.filtered.enriched.annotation.lengthDistribution.pdf", width = 4,height = 3)
+
+
+# lenth distribution for called circRNAs
+filter(df, circRNA %in% BC106$ID, type=="circularized exon") %>% separate(circRNA, c(NA,"start","end"), sep = "_", convert=T) %>% ggplot(aes(x=end-start, fill=as.factor(cirType))) + geom_histogram(position = 'stack',bins = 60)  + scale_color_brewer(palette="Dark2") + theme_minimal()+theme_classic()+theme(legend.position="top")+ scale_x_log10() + scale_fill_manual(values=c("orange", "red")) + ggsave("../results/Merge_circexplorer_BC106.annotation.lengthDistribution.pdf", width = 4,height = 3)
+
 
 ## ===============================================
 ## host genes function enrichment analysis
@@ -341,7 +372,11 @@ dim(genes_expressed)
 # circRNA host genes
 Merge_circexplorer_BC_annotation_per_cell=read.table("../results/Merge_circexplorer_BC.annotation_per_cell.xls", sep="\t", header=T, stringsAsFactors = F); head(Merge_circexplorer_BC_annotation_per_cell)
 # only circRNAs in SNDA and PY
-Merge_circexplorer_BC_annotation_per_cell = filter(Merge_circexplorer_BC_annotation_per_cell, celltype3 != "NN", circType == "circRNA"); dim(Merge_circexplorer_BC_annotation_per_cell) # 6895   16
+Merge_circexplorer_BC_annotation_per_cell = filter(Merge_circexplorer_BC_annotation_per_cell, celltype3 != "NN", circType == "circRNA"); dim(Merge_circexplorer_BC_annotation_per_cell) # 6798   16
+
+clip <- pipe("pbcopy", "w")                       
+dump(unique(Merge_circexplorer_BC_annotation_per_cell$geneName), file=clip)                               
+close(clip)
 
 # limit to lincRNA and protein-coding
 genes_expressed_symbol=subset(genes_annotation, EnsID %in% rownames(genes_expressed) & type %in% c('protein_coding', 'lincRNA'),select=symbol, drop =T)
@@ -376,7 +411,7 @@ nU5=select(nLw, contains("__u5")) %>% rename_all(.funs = funs(sub("__.*", "", .)
 common_Rows=Reduce(intersect, list(filtered_enriched_annotation, nS$ID, nU$ID, rownames(nC))); length(common_Rows)
 common_Cols=Reduce(intersect, list(colnames(nC), sample106, nS$sample, nU$sample)); length(common_Cols)
 nC=nC[common_Rows, sample106]; nS3=nS3[common_Rows, sample106]; nS5=nS5[common_Rows, sample106]; nU3=nU3[common_Rows, sample106]; nU5=nU5[common_Rows, sample106]
-save(nS3,nS5,nU3,nU5, file = "Merge_circexplorer_BC.annotation.bed14.nS3nS5nU3nU5.RData")
+save(nC,nS3,nS5,nU3,nU5, file = "Merge_circexplorer_BC.annotation.bed14.nS3nS5nU3nU5.RData")
 load("Merge_circexplorer_BC.annotation.bed14.nS3nS5nU3nU5.RData")
 nL=nS3+nS5+nU3+nU5  # not very fair to use the sum
 ## 3/21/2019: We could change to use max: nL=max(nS3,nS5,nU3,nU5)
@@ -391,17 +426,27 @@ nCLrange=range(c(nCL$nL,nCL$nC))
 
 # ratio boxplot
 head(nCL); dim(nCL)
-mutate(nCL, rCL=(1+(nC-nL)/(nC+nL))/2) %>%
+group_by(nCL, celltype) %>% summarise(rho=cor(nC,nL,method = 'spearman'))
+# celltype    rho
+# 1 FB       0.0654
+# 2 MCPY     0.114 
+# 3 PBMC     0.104 
+# 4 SNDA     0.113 
+# 5 TCPY     0.0895
+with(nCL, cor(nC, nL, method = 'spearman')) # 0.1028416
+
+mutate(nCL, rCL=nC/(nC+nL)) %>%
   ggplot(aes(factor(celltype, levels = c("SNDA","TCPY","MCPY","FB","PBMC")),rCL)) + 
   scale_y_log10(breaks = c(0,1e-5,1e-4,1e-3,0.01,.1,.5,1),labels = c(0,1e-5,1e-4,1e-3,0.01,.1,.5,1)) +
   geom_violin(aes(fill = factor(celltype, levels = c("SNDA","TCPY","MCPY","FB","PBMC"))), scale = "width", trim = FALSE) + 
   geom_boxplot(fill='white', width=0.1, outlier.shape = NA) + 
   scale_fill_manual(name="Cell types",
                      values=c("SNDA"="#F22A7B","TCPY" = "#3182bd","MCPY" = "#2659B2","FB" ="#BC9371","PBMC"="#D3CBCB")) +
-  labs(x="Cell types", y="Ratio between circular reads and linear reads") +
+  labs(x="Cell types", y="Circular-to-linear fraction (ratio = nC/total reads)") +
   theme_bw() + 
   theme(legend.position='none')
 ggsave("../results/Merge_circexplorer_BC106.annotation.bed14.nC.vs.nL.boxplot.pdf", width=4.5, height = 4.5)
+
 
 # nC vs. nL scatter plot
 set.seed(1)
@@ -503,57 +548,3 @@ do.call(rbind, apply(rpmC[expressed_rows,] - rpmL[expressed_rows, ], 1, wilcox.t
 #                 labels = trans_format("log10", math_format(10^.x))) +
 #   coord_fixed() +
 #   theme(legend.position='none')
-
-## ===============================================
-## get synaptic genes and test its enrichment
-## ===============================================
-## (1) 1461 genes in Synapse Proteomics Datasets in G2C (http://synsysdb.genes2cognition.org/db/GeneList/L00000069)
-G2C_PSP=read.delim("SYNSYSDBdb_L00000069_BAYES-COLLINS-HUMAN-PSD-FULL.txt", header = T, stringsAsFactors = F)$Symbol %>% unique()
-
-## (2) genes with GO term including key words "synapse" or "synaptic";
-library(biomaRt) #source("https://bioconductor.org/biocLite.R"); biocLite("biomaRt")
-library(dplyr)
-library(RCurl)
-ensembl_hs=useEnsembl(biomart="ensembl",GRCh=37,dataset='hsapiens_gene_ensembl')
-#listAttributes(ensembl_hs)
-listAttributes(ensembl_hs, page='feature_page')
-# get GO for all genes (if having GO annotation): N = 20475
-genesGO_all=getBM(attributes=c('ensembl_gene_id','hgnc_symbol', 'go_id','name_1006','namespace_1003'),
-                  filters =c('biotype','transcript_biotype','with_go'), 
-                  values =list("protein_coding","protein_coding",T),
-                  mart = ensembl_hs) %>% 
-  rename(go_name=name_1006, go_domain=namespace_1003) %>% distinct
-write.table(genesGO_all, file='genesGO_all.tab',sep = "\t", row.names = F)
-genes_with_synapse_GO = genesGO_all %>% subset(grepl("synaptic|synapse", go_name), select=hgnc_symbol, drop=T) %>% unique()
-
-# join "synapse" column
-annotation$synapse=ifelse(annotation$geneName %in% c(G2C_PSP, genes_with_synapse_GO), "yes", "no")
-
-total_circRNA_raw_reads_filtered = rowSums(Merge_circexp_raw[rowSums(Merge_circexp_raw)>=10, ])
-total_circRNA_raw_reads_filtered_annotation=cbind(annotation[match(names(total_circRNA_raw_reads_filtered), annotation$ID),c('ID','geneName','synapse')], total_circRNA_raw_reads_filtered)
-
-# all genes expressed in the 20 samples (RPKM>0.1)
-fpkm=read.table("~/neurogen/rnaseq_PD/results/merged/genes.fpkm.cuffnorm.allSamples.uniq.xls", header = T, row.names = 1, stringsAsFactors = F, check.names = F)
-expressed_genes = gsub("\\..*","",rownames(fpkm)[rowMeans(fpkm[,sample20])>1])
-expressed_genes_name = unique(genesGO_all$hgnc_symbol[genesGO_all$ensembl_gene_id %in% expressed_genes])
-expressed_genes_ID = unique(genesGO_all$ensembl_gene_id[genesGO_all$ensembl_gene_id %in% expressed_genes])
-write(expressed_genes_ID, file="pilot20_expressed_hostgenes.txt")
-# write gene name to file for GSEA analysis
-circRNA_hostgene = unique(as.character(total_circRNA_raw_reads_filtered_annotation$geneName))
-write(circRNA_hostgene[circRNA_hostgene %in% expressed_genes_name], file="pilot20_circRNA_hostgenes.txt")
-
-mytable=table(total_circRNA_raw_reads_filtered_annotation$synapse)
-lbls=paste(names(mytable), "\n", mytable, sep="")
-pie(mytable, labels = lbls, main="Pie chart of circRNAs of host genes with synaptic function")
-
-mytable=table(unique(total_circRNA_raw_reads_filtered_annotation[,2:3])$synapse)
-mytable
-
-allgenes = unique(genesGO_all$hgnc_symbol)
-synapse=ifelse(allgenes %in% c(G2C_PSP, genes_with_synapse_GO), "yes", "no")
-circRNA=ifelse(allgenes %in% circRNA_hostgene, "yes", "no")
-fisher.test(table(synapse, circRNA))
-
-
-hist(total_circRNA_raw_reads_filtered_annotation$total_circRNA_raw_reads_filtered[total_circRNA_raw_reads_filtered_annotation$total_circRNA_raw_reads_filtered<=200], col="Red")
-hist(total_circRNA_raw_reads_filtered_annotation$total_circRNA_raw_reads_filtered[total_circRNA_raw_reads_filtered_annotation$synapse=='yes'], breaks=seq(1,15000,1000), col="Blue", add=TRUE)

@@ -3,7 +3,8 @@ cd ~/projects/circRNA/data/
 
 #circRNA_annotation=Merge_circexplorer_BC.annotation.bed14  # BRAINCODE only
 #circRNA_annotation=Merge_circexplorer_BC_RM.annotation.bed14  # BRAINCODE+RM
-circRNA_annotation=Merge_circexplorer_BC.annotation.bed14.matched  # BC exon number- and length-matched controls
+#circRNA_annotation=Merge_circexplorer_BC.annotation.bed14.matched  # BC exon number- and length-matched controls
+circRNA_annotation=exons.internal.meta.pc.bed  # internal meta exons in the genome background
 
 ##========================================================================
 # 1. get the 1nt--1nt around the two ends of circRNA
