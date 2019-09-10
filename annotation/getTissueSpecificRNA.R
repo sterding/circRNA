@@ -10,14 +10,16 @@ library(dplyr)
 library(tidyverse)
 library(reshape2)
 
-normRPM_file = "Merge_circexplorer_BC.filtered.enriched.normRPM.rds"
-
 setwd("~/projects/circRNA/data")
+
 # calculate specificity score (S) as cummeRbund (https://github.com/Bioconductor-mirror/cummeRbund/blob/master/R/tools.R)
 source("~/projects/circRNA/src/annotation/tools.R")
 
-Merge_circexp_norm_filtered_and_enriched=readRDS(normRPM_file); dim(Merge_circexp_norm_filtered_and_enriched)
-annotation = readRDS("Merge_circexplorer_BC106.annotation.bed14.rds")
+Merge_circexp_norm_filtered_and_enriched=readRDS("Merge_circexplorer_BC197.filtered.enriched.normRPM.rds")
+annotation = readRDS("Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.rds")
+
+dim(Merge_circexp_norm_filtered_and_enriched); dim(annotation)
+
 ###########################################
 ## circRNA expressed in each cell #########
 ###########################################
@@ -32,43 +34,36 @@ df = df %>% mutate(gene=rownames(df)) %>% gather(key = "sampleID", value='fpkm',
 
 ## In individual circType
 df %>% merge(annotation, by.x='gene',by.y='ID', all.x=T, all.y=F) %>% select(gene, cellType3, cellType5, circType) %>% group_by(cellType5, circType) %>% summarise(n=n_distinct(gene)) %>% dcast(cellType5 ~ circType, value.var="n") 
-#    cellType5 circRNA ciRNA
-# 1        FB    1839   252
-# 2      MCPY    1185    14
-# 3      PBMC    5420   150
-# 4      SNDA    5330    89
-# 5      TCPY    2854    31
+#   cellType5 circRNA ciRNA
+# 1        FB    1929   264
+# 2      MCPY    1246    17
+# 3      PBMC    5817   168
+# 4      SNDA    6566   133
+# 5      TCPY    8237   144
 df %>% merge(annotation, by.x='gene',by.y='ID', all.x=T, all.y=F) %>% select(gene, cellType3, cellType5, circType) %>% group_by(cellType3, circType) %>% summarise(n=n_distinct(gene)) %>% dcast(cellType3 ~ circType, value.var="n") #%>% write.table(file=clip, sep="\t", row.names=F)
-#     cellType3 circRNA ciRNA
-# 1        NN    6037   285
-# 2        PY    3470    41
-# 3      SNDA    5330    89
+#   cellType3 circRNA ciRNA
+# 1        NN    6483   309
+# 2        PY    8511   147
+# 3      SNDA    6566   133
 
 ## annotation per cell type
-df %>% group_by(gene) %>% summarize(celltype3 = paste(unique(cellType3), collapse = ','), celltype5 = paste(unique(cellType5), collapse = ',')) %>% ungroup() %>% merge(annotation, by.x='gene',by.y='ID', all.x=T, all.y=F) %>% write.table(file="../results/Merge_circexplorer_BC.annotation_per_cell.xls", sep="\t", quote=F, row.names=F)
-#                       gene  celltype3      celltype5 chrom     start       end score strand thickStart  thickEnd itemRgb exonCount                   exonSizes                         exonOffsets circType geneName
-# 1   chr1_10032075_10041228 NN,PY,SNDA PBMC,MCPY,SNDA  chr1  10032075  10041228     1      +   10032075  10032075   0,0,0         3                 171,184,140                         0,3574,9013  circRNA   NMNAT1
-# 2 chr1_100340242_100343384       SNDA           SNDA  chr1 100340242 100343384     1      +  100340242 100340242   0,0,0         5          124,103,98,140,188                 0,467,671,1771,2954  circRNA      AGL
-# 3 chr1_100342013_100347247         PY           TCPY  chr1 100342013 100347247     1      +  100342013 100342013   0,0,0         7 140,188,124,164,102,156,151     0,1183,3465,4174,4618,4834,5083  circRNA      AGL
-# 4 chr1_100515464_100535241    NN,SNDA      PBMC,SNDA  chr1 100515464 100535241     1      +  100515464 100515464   0,0,0         7    96,63,128,115,219,114,72 0,8757,9969,11926,18068,18564,19705  circRNA    HIAT1
-# 5 chr1_100889777_100908552         NN           PBMC  chr1 100889777 100908552     1      +  100889777 100889777   0,0,0         3                    80,67,63                       0,15710,18712  circRNA   CDC14A
-# 6 chr1_100949847_100964818         NN           PBMC  chr1 100949847 100964818     1      +  100949847 100949847   0,0,0         5          160,113,48,123,334           0,10526,11710,13793,14637  circRNA   CDC14A
+df %>% group_by(gene) %>% summarize(celltype3 = paste(unique(cellType3), collapse = ','), celltype5 = paste(unique(cellType5), collapse = ',')) %>% ungroup() %>% merge(annotation, by.x='gene',by.y='ID', all.x=T, all.y=F) %>% write.table(file="../results/Merge_circexplorer_BC197.annotation_per_cell.xls", sep="\t", quote=F, row.names=F)
 
 celltype3_n = df %>% group_by(gene) %>% summarize(celltype3 = paste(unique(cellType3), collapse = ','), celltype5 = paste(unique(cellType5), collapse = ',')) %>% group_by(celltype3) %>% summarise(n=n())
-# celltype3     n
-# 1         NN  3119
-# 2      NN,PY   516
-# 3 NN,PY,SNDA  1237
-# 4    NN,SNDA  1450
-# 5         PY   963
-# 6    PY,SNDA   795
-# 7       SNDA  1937
+#  celltype3      n
+# 1 NN          2362
+# 2 NN,PY       1362
+# 3 NN,PY,SNDA  2305
+# 4 NN,SNDA      763
+# 5 PY          2978
+# 6 PY,SNDA     2013
+# 7 SNDA        1618
 
-## call eulerAPE to generate Merge_circexplorer_BC.venn_celltype3.pdf
+## call eulerAPE to generate Merge_circexplorer_BC197.venn_celltype3.svg
 
 # 5-ways venn diagram (not area-proportional)
 library(gplots); # install.packages('gplots')
-pdf("../results/Merge_circexplorer_BC.venn_celltype5.pdf")
+pdf("../results/Merge_circexplorer_BC197.venn_celltype5.pdf")
 venn(list(SNDA = unique(df$gene[df$cellType5=='SNDA']),
           TCPY = unique(df$gene[df$cellType5=='TCPY']),
           MCPY = unique(df$gene[df$cellType5=='MCPY']),
@@ -100,34 +95,33 @@ group3mean = df %>% mutate(gene=rownames(df)) %>% melt(id.vars="gene", variable.
   dcast(gene ~ cellType, value.var='meanFPKM')
 
 groupmean_s3 = groupmean_to_specificity(group3mean)
-df3 = groupmean_s3 %>% filter(Private_or_not==1) 
+df3 = groupmean_s3 %>% filter(Private_or_not==1) ## n = 10945
 group_by(df3, celltype) %>% summarise(count=n())
-# celltype count
-# 1       NN  4860
-# 2       PY  1850
-# 3     SNDA  2023
+#   celltype count
+# 1 NN        4622
+# 2 PY        4436
+# 3 SNDA      1887
 
 groupmean_s5 = groupmean_to_specificity(group5mean)
 df5 = groupmean_s5 %>% filter(Private_or_not==1) 
 group_by(df5, celltype) %>% summarise(count=n())
-# celltype count
-# 1 FB         795
-# 2 MCPY       461
-# 3 PBMC      3672
-# 4 SNDA      1991
-# 5 TCPY      1295
+#   celltype count
+# 1 FB         763
+# 2 MCPY       426
+# 3 PBMC      3627
+# 4 SNDA      1904
+# 5 TCPY      3968
 
 ## df3 and df5 are very similar
 rbind(data.frame(gene=df3$gene, DF="df3"), data.frame(gene=df5$gene, DF="df5")) %>% group_by(gene) %>% summarize(DFs = paste(unique(DF), collapse = ',')) %>% group_by(DFs) %>% summarise(n=n())
 #   DFs         n
-# 1 df3       758
-# 2 df3,df5  7975
-# 3 df5       239
+# 1 df3       887
+# 2 df3,df5 10058
+# 3 df5       630
 
 ###########################################
 # heatmpa of cell specific circRNAs
 ###########################################
-library('pheatmap')
 
 #=====
 ## cell-specific circRNAs in the 5 minor groups
@@ -190,7 +184,7 @@ dissimilarity <- 1 - cor(df)
 distance <- as.dist(dissimilarity)
 hc=hclust(distance)
 hccol=as.dendrogram(hc)
-weights.dd <- order(match(c("PBMC","FB","SNDA","MCPY","TCPY"), celltypes)) # the trick is to call order() on the specific index of target dendragram
+weights.dd <- order(match(c("PBMC","FB","SNDA","TCPY","MCPY"), celltypes)) # the trick is to call order() on the specific index of target dendragram
 #plot(reorder(hccol, wts = weights.dd))
 
 dissimilarity <- 1 - cor(t(df))
@@ -198,6 +192,7 @@ distance <- as.dist(dissimilarity)
 hcrow=hclust(distance, method = 'average')
 roworders = hcrow$order # order of the new rows in the old matrix
 library(RColorBrewer) 
+library('pheatmap')
 hm.parameters <- list(df, 
                       color = colorRampPalette(c("#999999","#ffffff", "#ca0020"))(100),
                       scale = "row",
@@ -207,53 +202,53 @@ hm.parameters <- list(df,
                       show_rownames = F, show_colnames = T,
                       clustering_method = "average",
                       cluster_rows = hcrow, cluster_cols = as.hclust(reorder(hccol, wts = weights.dd, agglo.FUN = mean)), 
+                      cutree_cols = 5, # to allow small gap space between columns
                       clustering_distance_rows = 'correlation', 
                       clustering_distance_cols = 'correlation')
 hm=do.call("pheatmap", hm.parameters)
-do.call("pheatmap", c(hm.parameters, width=3, height=5, filename="../results/Merge_circexplorer_BC.cellspecific_heatmap++.pdf"))
+do.call("pheatmap", c(hm.parameters, width=3, height=5, filename="../results/Merge_circexplorer_BC197.cellspecific_heatmap++.pdf"))
 
 ###########################################
 # host genes of cell-specific circRNAs
 ###########################################
 # circRNAs in the order of presence in above figure
-df_roworders = df3$gene[roworders]; head(df_roworders); length(df_roworders)  # n = 8733
+df_roworders = df3$gene[roworders]; head(df_roworders); length(df_roworders)  # n = 10945
 DF3=groupmean_s3[df_roworders,]; dim(DF3); head(DF3); table(DF3$Private_or_not)
 
 ## add host gene of the cell-specific circRNAs
-filtered_enriched_annotation=readRDS("Merge_circexplorer_BC106.filtered.enriched.annotation.bed14.rds"); head(filtered_enriched_annotation)
-genes=read.table("~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/Genes/genes.bed", header = F, col.names = c("chr","start","end","EnsID","score","strand","geneName","geneType"), stringsAsFactors = F)
+filtered_enriched_annotation=readRDS("Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.rds"); head(filtered_enriched_annotation); dim(filtered_enriched_annotation)
 DF3$hostgene=filtered_enriched_annotation$geneName[match(DF3$gene, filtered_enriched_annotation$ID)]
-DF3$hostgeneID=genes$EnsID[match(DF3$hostgene, genes$geneName)]  
-# In total 111 genes are discarded, as not found in the gencode table  (Note: in the future, circExplorer should use the same gene annotation as  GENCODE)
-dim(DF3); DF3=filter(DF3, !is.na(hostgeneID)); dim(DF3) # 8733--> 8622
+DF3$hostgeneID=filtered_enriched_annotation$geneID[match(DF3$gene, filtered_enriched_annotation$ID)] 
+dim(DF3); DF3=filter(DF3, !is.na(hostgeneID)); dim(DF3) # 10945
 
 ## How many host genes per celltype
-DF3 %>% select(hostgene, celltype) %>% distinct() %>% group_by(celltype) %>% summarise(n=n())
-# 1 NN        2123
-# 2 PY        1155
-# 3 SNDA      1316
+DF3 %>% dplyr::select(hostgene, celltype) %>% distinct() %>% group_by(celltype) %>% summarise(n=n())
+# 1 NN        2133
+# 2 PY        2233
+# 3 SNDA      1289
 
 ## save the list into table for downstream GO analysis
-DF3 %>% select(celltype, hostgene) %>% distinct() %>% group_by(celltype) %>% mutate(n=n(), hostgene = paste0(unique(hostgene), collapse = ";")) %>% distinct() %>% write.table(file="../results/Merge_circexplorer_BC.cellspecific_heatmap5.genes3.txt", sep = "\t", col.names = T, quote=F, row.names = F)
+DF3 %>% dplyr::select(celltype, hostgene) %>% distinct() %>% group_by(celltype) %>% mutate(n=n(), hostgene = paste0(unique(hostgene), collapse = ";")) %>% distinct() %>% write.table(file="../results/Merge_circexplorer_BC197.cellspecific_heatmap5.genes3.txt", sep = "\t", col.names = T, quote=F, row.names = F)
+DF3 %>% dplyr::select(celltype, hostgeneID) %>% mutate(hostgeneID=sub("\\..*","",hostgeneID)) %>% distinct() %>% group_by(celltype) %>% mutate(n=n(), hostgeneID = paste0(unique(hostgeneID), collapse = ";")) %>% distinct() %>% write.table(file="../results/Merge_circexplorer_BC197.cellspecific_heatmap5.genes3.EnsID.txt", sep = "\t", col.names = T, quote=F, row.names = F)
 ## GO to DAVID website to run KEGG pathway analysis, then go to getTissueSpecificRNA.makingGObarplot.R to make the figures
 
-## divide into venn diagram --> ## call eulerAPE to generate Merge_circexplorer_BC.cellspecific_heatmap5.genes3.venn_final.pdf
+## divide into venn diagram --> ## call eulerAPE to generate Merge_circexplorer_BC197.cellspecific_heatmap5.genes3.venn_final.pdf
 DF3 %>% arrange(celltype, hostgene)%>% group_by(hostgene) %>% summarize(celltype3 = paste(unique(celltype), collapse = ',')) %>% group_by(celltype3) %>% summarise(n=n(), gene3 = paste(unique(hostgene), collapse = ';'))
 DF3 %>% arrange(celltype, hostgene)%>% group_by(hostgene) %>% summarize(celltype3 = paste(unique(celltype), collapse = ',')) %>% group_by(celltype3) %>% summarise(n=n(), gene3 = paste(unique(hostgene), collapse = ';')) %>% write.table(file="../results/Merge_circexplorer_BC.cellspecific_heatmap5.genes3.overlapping.txt", sep = "\t", col.names = T, quote=F, row.names = F)
-# celltype3      n gene3                                                                                                                                                                                                              
-# 1 NN          1264 AASS;AATF;ABCB10;ABCC1;ABCC3;ABCC4;ABR;ACADM;ACTR10;ACTR2;ACTR3;ADAM23;ADAMTS12;ADAMTS6;ADAMTSL1;ADD1;ADK;AFF4;AFG3L2;AGFG1;AGO3;AGO4;AGPAT5;AGPAT6;AKAP10;AKAP7;AKIRIN1;AKT2;ALAS1;ALG6;ALG9;ALKBH8;AMN1;AMZ2;ANAPC…
-# 2 NN,PY        268 ACPL2;ADAL;AEBP2;AFF1;AGGF1;AHCTF1;ALMS1;ALS2;ALS2CR12;AP3B1;ARAP2;ARHGAP19-SLIT1;ARHGEF9;ARID2;ARIH1;ASCC1;ASH2L;ATF7;ATP8B4;BDP1;BICD1;BMPR2;BRD4;BTBD7;C11orf30;C2CD3;C2CD5;C9orf41;CAPN2;CAPN7;CCAR1;CCDC149;CCD…
-# 3 NN,PY,SNDA   276 AAK1;ABCA3;ACSL3;ADAM32;ADD3;ADRBK2;AGTPBP1;AK5;AKAP13;AKT3;AMPH;ANKRD13C;ANKRD17;ANKRD27;APC;AQR;ARFGEF2;ARHGAP10;ARHGAP21;ARHGAP26;ARHGEF12;ARNT2;ARSG;ASAP1;ASPH;ATE1;ATF2;ATF6;ATP6V0A1;ATP8A1;ATP9B;ATXN1;ATXN1…
-# 4 NN,SNDA      315 ABHD2;ABI1;ABI2;ACSL4;ADAM10;ADAM17;AFF3;AFTPH;AHI1;AKAP6;AKAP9;ALG8;ALS2CR11;AMOT;ANKRD32;ANO10;ANO6;ARFGEF1;ARHGAP6;ARHGEF7;ARMC8;ASH1L;ASXL2;ATF1;ATP11B;ATP2B4;ATP6V0A2;ATRX;B3GALNT2;BARD1;BAZ2B;BBS7;BCL2L13;B…
-# 5 PY           382 ABCA5;ABCG2;ABLIM2;ACER2;ACP6;ACTR3B;ADAM9;ADAMTS17;ADAMTS19;ADCK4;ADCY1;AGBL3;AGBL4;AGK;AGO2;AIMP2;ANKMY2;ANKRD24;ANTXR1;ARHGAP32;ARHGAP5;ARPP21;ARRB1;ASCC2;ASTN2;ATG14;ATG2B;ATP10D;ATP2B1;B3GALTL;BAZ1B;BEND3;BE…
-# 6 PY,SNDA      229 ACAD11;ACAP2;AGL;AMBRA1;ANKIB1;ANKS1A;ANKS1B;ANO4;ANO5;APBB2;APP;ARHGEF28;ARID1B;ARMC2;ARMC9;ARNTL2;ATG7;ATP2C1;ATP8A2;ATP9A;ATRNL1;BAI3;BTBD9;C11orf74;C18orf8;C9orf3;CACNA2D1;CACNA2D3;CACNB2;CADPS;CADPS2;CAMSAP2…
-# 7 SNDA         496 ABLIM1;ACACA;ACACB;ADAMTSL3;ADARB1;ADCY2;ADCY9;AGAP1;AGPS;ALDH3A2;ANK2;ANK3;ANKAR;AP2B1;AP2M1;ARAP1;ARFGAP3;ARGLU1;ARHGEF10L;ARHGEF11;ARHGEF26;ARHGEF4;ARID4B;ASXL3;ATF6B;ATG5;ATP10B;ATP1A1OS;ATP1A3;ATP6V1H;ATP8B1…
+# # celltype3      n gene3                                                                                                                                                                            
+# 1 NN          1005 AAGAB;AASS;AATF;ABCB10;ABCC1;ABCC3;ABR;AC004381.6;AC068533.7;AC093838.4;ACTG1;ACTR10;ACTR2;ACTR3;ACYP2;ADAMTS12;ADAMTS6;ADAMTSL1;AFG3L2;AGFG1;AGGF1;AGPAT6;AHSA2;AK9;AKAP7;AKIRIN1;A…
+# 2 NN,PY        581 ABI1;ACADM;ADAL;ADD1;ADK;AEBP2;AFF1;AFF3;AFF4;AGO3;ALG9;ALMS1;ALS2;ALS2CR12;AMN1;ANAPC1;ANKHD1;ANKRD12;ANKRD28;ANKRD32;APAF1;APBA1;APC;APLF;APLP2;ARAP2;ARHGAP12;ARHGAP18;ARHGAP19-S…
+# 3 NN,PY,SNDA   373 AAK1;ABI2;ACSL4;ADAM10;ADAM32;ADD3;ADRBK2;AGTPBP1;AHCTF1;AHI1;AK5;AKAP10;AKAP13;AKT3;ALG8;ALS2CR11;AMPH;ANKAR;ANKRD13C;ANKRD17;ANKRD27;ANO10;AQR;ARFGEF1;ARFGEF2;ARHGAP10;ARHGAP26;A…
+# 4 NN,SNDA      174 ABCC4;ADAM17;ADAM23;AGO4;AKAP6;AKAP9;AMOT;ANO6;ARHGAP6;ARSG;ATP6V0A2;ATRX;B4GALT6;BNC2;BTBD10;C10orf32-ASMT;C4orf29;CCP110;CDH8;CELF1;CEP350;CEP63;CERS6;CHMP5;CIRH1A;CNTRL;COG3;CRI…
+# 5 PY           932 AACS;AASDH;ABAT;ABCA3;ABCA5;ABCC5;ABCC9;ABCD3;ABL2;ABLIM2;AC004076.9;AC034228.7;AC066593.1;AC067956.1;AC074391.1;ACADSB;ACAT1;ACBD5;ACBD6;ACER2;ACER3;ACOT9;ACP6;ACTN4;ACTR3B;ADAM19…
+# 6 PY,SNDA      347 ABLIM1;ACAD11;ACAP2;ACSL3;ADAMTS19;ADARB1;AGAP1;AGL;AMBRA1;ANK3;ANKH;ANKIB1;ANKRD26;ANKS1A;ANKS1B;ANO4;ANO5;APBB2;ARHGAP32;ARHGEF26;ARHGEF28;ARHGEF7;ARID1B;ARMC2;ARMC9;ATG7;ATP10B;…
+# 7 SNDA         395 ABCA1;AC004893.11;AC010642.1;AC012307.3;ACACA;ACACB;ACSS3;ADAMTSL3;ADCY2;AF127936.7;AGAP3;AGPS;AMMECR1L;ANK1;ANK2;ANKRD20A7P;AP2B1;AP2M1;APITD1-CORT;ARAP1;ARFGAP3;ARFIP1;ARHGEF11;A…
 
 ## ===========
 ## cell-specificity of the host genes (in celltype3)
 ## ===========
-gene_fpkm=read.table("~/neurogen/rnaseq_PD/results/merged/genes.fpkm.cuffnorm.allSamples.uniq.xls", header = T, row.names = 1, stringsAsFactors = F, check.names = F); head(gene_fpkm)
-gene_fpkm=gene_fpkm[,colnames(Merge_circexp_norm_filtered_and_enriched)]; dim(gene_fpkm)
+gene_fpkm=read.table("~/neurogen/rnaseq_PD/results/merged/genes.fpkm.cufflinks.allSamples.BCv2.uniq.xls", header = T, row.names = 1, stringsAsFactors = F, check.names = F); 
+gene_fpkm=gene_fpkm[,colnames(Merge_circexp_norm_filtered_and_enriched)]; head(gene_fpkm); dim(gene_fpkm);
 matrix_fpkm_to_tpm <- function(fpkm) t(t(fpkm) / colSums(fpkm)) * 1e6  # Note: matrix / vector is by rows, transpose it if by columns
 gene_tpm = as.data.frame(matrix_fpkm_to_tpm(gene_fpkm))  ## convert FPKM to TPM, in order to have equal sum of expression for each sample
 gene_group5mean = gene_tpm %>% rownames_to_column(var = 'gene') %>% melt(id.vars="gene", variable.name = "sampleID", value.name='fpkm') %>%
@@ -275,9 +270,9 @@ head(gene_group3mean)
 
 ## background: cell-specific genes
 groupmean_to_specificity(gene_group3mean) %>% filter(Private_or_not==1) %>% group_by(celltype) %>% summarise(n=n())
-# 1 NN         472
-# 2 PY        1348
-# 3 SNDA      7626
+# 1 NN         319
+# 2 PY        1513
+# 3 SNDA      6377
 
 gene_group3mean_DF3 = gene_group3mean[match(unique(DF3$hostgeneID), gene_group3mean$gene),]
 gene_groupmean_s3_DF3 = groupmean_to_specificity(gene_group3mean_DF3)
@@ -287,37 +282,39 @@ DF3 = inner_join(DF3, gene_groupmean_s3_DF3,by = c("hostgeneID" = "gene"), suffi
 DF3 = mutate(DF3, celltype.specific.gene = ifelse(Private_or_not.gene==1, celltype.gene, "NS"))
 dim(DF3)
 
-for(i in c("NN","PY","SNDA")) {print(i); filter(DF3, celltype.circRNA==i, Private_or_not.gene==1) %>% select(hostgene, celltype.gene) %>% distinct()%>% group_by(celltype.gene) %>% summarise(n=n()) %>% print()}
+## Any host genes for cell-specific circRNAs are private genes? None!
+for(i in c("NN","PY","SNDA")) {print(i); filter(DF3, celltype.circRNA==i, Private_or_not.gene==1) %>% dplyr::select(hostgene, celltype.gene) %>% distinct()%>% group_by(celltype.gene) %>% summarise(n=n()) %>% print()}
+# or table(dplyr::select(DF3, Private_or_not.circRNA, Private_or_not.gene))
 # zero
 
-for(i in c("NN","PY","SNDA")) {print(i); filter(DF3, celltype.circRNA==i) %>% select(hostgene, celltype.gene) %>% distinct() %>% group_by(celltype.gene) %>% summarise(n=n()) %>% print()}
+for(i in c("NN","PY","SNDA")) {print(i); filter(DF3, celltype.circRNA==i) %>% dplyr::select(hostgene, celltype.gene) %>% distinct() %>% group_by(celltype.gene) %>% summarise(n=n()) %>% print()}
 ggplot(DF3, aes(x=factor(celltype.gene), fill=factor(celltype.circRNA))) +
   geom_bar(stat="count", width=0.7, fill="steelblue")+ 
   coord_flip() +
   facet_grid(cols=vars(celltype.circRNA), scales ='free') +
   theme_minimal()
-ggsave("../results/Merge_circexplorer_BC.cellspecific_barplot++.hostgene.pdf", width = 10, height = 2)
+ggsave("../results/Merge_circexplorer_BC197.cellspecific_barplot++.hostgene.pdf", width = 10, height = 2)
 # [1] "NN"
 # celltype.gene     n
-# 1 NN             1100
-# 2 PY              629
-# 3 SNDA            394
+# 1 NN             1094
+# 2 PY              693
+# 3 SNDA            346
 
 # [1] "PY"
 # celltype.gene     n
-# 1 NN              301
-# 2 PY              596
-# 3 SNDA            258
+# 1 NN              631
+# 2 PY             1104
+# 3 SNDA            498
 
 # [1] "SNDA"
 # celltype.gene     n
-# 1 NN              346
-# 2 PY              555
-# 3 SNDA            415
+# 1 NN              336
+# 2 PY              570
+# 3 SNDA            383
 
 ## spec.circRNA vs. spec.gene for the same cell type
 xx=DF3 %>% mutate(x=match(paste0(celltype.circRNA,"_spec.gene"), colnames(DF3))) 
-xx = xx %>% mutate(S.circRNA.gene = DF3[cbind(seq_along(x), x)]) %>% select(celltype.circRNA, S.circRNA, S.circRNA.gene) %>% gather("circRNA_or_gene", "specificity_score", -1, convert = T) %>% mutate(circRNA_or_gene=as.factor(circRNA_or_gene), celltype.circRNA=as.factor(celltype.circRNA), specificity_score=as.numeric(specificity_score))
+xx = xx %>% mutate(S.circRNA.gene = DF3[cbind(seq_along(x), x)]) %>% dplyr::select(celltype.circRNA, S.circRNA, S.circRNA.gene) %>% gather("circRNA_or_gene", "specificity_score", -1, convert = T) %>% mutate(circRNA_or_gene=as.factor(circRNA_or_gene), celltype.circRNA=as.factor(celltype.circRNA), specificity_score=as.numeric(specificity_score))
 ggplot(xx, aes(x=celltype.circRNA, y=specificity_score, fill=circRNA_or_gene)) + 
   geom_violin(trim = T, scale = "width", position = position_dodge(width = .51)) + 
   coord_flip() +
@@ -326,7 +323,7 @@ ggplot(xx, aes(x=celltype.circRNA, y=specificity_score, fill=circRNA_or_gene)) +
   #geom_jitter(height = 0, width = 0.1)
   #geom_boxplot() +
   #geom_point(aes(fill = circRNA_or_gene), size = 5, shape = 21, position = position_jitterdodge())
-ggsave("../results/Merge_circexplorer_BC.cellspecific_boxplot++.specificityscore.pdf")
+ggsave("../results/Merge_circexplorer_BC197.cellspecific_boxplot++.specificityscore.pdf", width=6, height = 2)
 
 ## heatmap of host genes of cell-specific circRNAs
 X=gene_group5mean[match(DF3$hostgeneID, gene_group5mean$gene),]; head(X); dim(X); 
@@ -335,7 +332,7 @@ dissimilarity <- 1 - cor(X)
 distance <- as.dist(dissimilarity)
 hc=hclust(distance)
 hccol=as.dendrogram(hc)
-weights.dd <- order(match(c("PBMC","FB","SNDA","MCPY","TCPY"), colnames(X))) # the trick is to call order() on the specific index of target dendragram
+weights.dd <- order(match(c("PBMC","FB","SNDA","TCPY","MCPY"), colnames(X))) # the trick is to call order() on the specific index of target dendragram
 #plot(reorder(hccol, wts = weights.dd, agglo.FUN = mean))
 
 my_gene_col <- data.frame(celltype=DF3$celltype.circRNA, row.names = rownames(X))
@@ -348,16 +345,16 @@ hm.parameters <- list(X,
                       kmeans_k = NA,
                       show_rownames = F, show_colnames = T,
                       annotation_row = my_gene_col,
-                      cutree_cols = 5,
+                      cutree_cols = 5, # to allow small gap space between columns
                       cluster_rows = F, cluster_cols = as.hclust(reorder(hccol, wts = weights.dd, agglo.FUN = mean)))
 library(pheatmap);
 do.call("pheatmap", hm.parameters)
-do.call("pheatmap", c(hm.parameters, width=3, height=5, filename="../results/Merge_circexplorer_BC.cellspecific_heatmap++.hostgene.pdf"))
+do.call("pheatmap", c(hm.parameters, width=3, height=5, filename="../results/Merge_circexplorer_BC197.cellspecific_heatmap++.hostgene.pdf"))
 
 #############################################
-# cell-specific isoform of circRNAs, esp. those from the same host gene (esp. the 505 shared genes btw SNDA and PY)
+# cell-specific isoform of circRNAs, esp. those from the same host gene (esp. the 720 shared genes btw SNDA and PY)
 #############################################
-Merge_circexp_raw_filtered_and_enriched = readRDS(file="Merge_circexplorer_BC106.filtered.enriched.rawcount.rds")
+Merge_circexp_raw_filtered_and_enriched = readRDS(file="Merge_circexplorer_BC197.filtered.enriched.rawcount.rds")
 # 3 groups max
 group3max = Merge_circexp_raw_filtered_and_enriched %>% mutate(gene=rownames(Merge_circexp_raw_filtered_and_enriched)) %>% 
   melt(id.vars="gene", variable.name = "sampleID", value.name='fpkm') %>%
@@ -386,18 +383,9 @@ x=DF3 %>% filter(Private_or_not.circRNA==1) %>% arrange(celltype.circRNA) %>%
   summarise(celltype3s.circRNA = paste((celltype.circRNA), collapse = ','), 
             celltype3n.circRNA = length(unique(celltype.circRNA)), 
             genes = paste((gene), collapse = ','),
-            genen = length((gene)),
+            geneN = length((gene)),
             RPMs_SNDA_PY_NN=paste(RPM_SNDA_PY_NN, collapse = ','),
             max3nonzeros = paste((max3nonzero), collapse = ','),
             max3mean=max(max3))  %>%
   arrange(-max3mean) %>% 
-  filter(celltype3n.circRNA>1, hostgene %in% c('PHF21A','SETD2','ERC1','MAN2A1','PSEN1','ATXN10')) 
-
-
-
-
-
-
-
-
-
+  filter(celltype3n.circRNA>1, hostgene %in% c('PHF21A','SETD2','ERC1','MAN2A1','PSEN1','ATXN10'))
