@@ -3,6 +3,7 @@
 ###########################################
 #!/bin/sh
 
+
 # begin R script
 library("tidyverse")
 library(RCurl)
@@ -17,44 +18,56 @@ sampleTable=read.delim(textConnection(getURL(sampleTable_url)), stringsAsFactors
   filter(BRAINcode2.final.selection==1) %>% 
   select(SAMPLE_ID=SOURCE_SAMPLE_ID, SUBJECT_ID=SOURCE_SUBJECT_ID, CELLTYPE=CELL, BATCH, RIN)
 head(subjectTable); head(sampleTable); 
-dim(sampleTable) # n=197
+dim(sampleTable) # n=284
 
 ## PD pathology group table
-left_join(x=sampleTable, y=subjectTable, by = "SUBJECT_ID") %>% filter(CELLTYPE=="SNDA") %>% select(SUBJECT_ID, CONDITION, AGE, SEX, PMI, MUSS, Unified_LB_Stage, PD.pathology.group, SAMPLE_ID, CELLTYPE, BATCH, RIN) %>% arrange(PD.pathology.group, CONDITION) %>% write.table(file="Table.PD.SNDA.pathology.covariates.xls", sep="\t", col.names = TRUE, row.names = F, quote = F)
+left_join(x=sampleTable, y=subjectTable, by = "SUBJECT_ID") %>% filter(CELLTYPE=="SNDA") %>% 
+  select(SUBJECT_ID, CONDITION, AGE, SEX, PMI, MUSS, Unified_LB_Stage, PD.pathology.group, SAMPLE_ID, CELLTYPE, BATCH, RIN) %>% 
+  mutate(PDpathologygroup=ifelse(PD.pathology.group=="no","hc",ifelse(PD.pathology.group=="late" | PD.pathology.group=="early","pd",PD.pathology.group))) %>%
+  mutate(CONDITION2=ifelse(CONDITION=="ILB" | CONDITION=="PD","PD",CONDITION)) %>%
+  arrange(CONDITION2, CONDITION) %>% 
+  write.table(file="Table.PD.SNDA.pathology.covariates.xls", sep="\t", col.names = TRUE, row.names = F, quote = F)
 
 ## AD pathology group table
-left_join(x=sampleTable, y=subjectTable, by = "SUBJECT_ID") %>% filter(CELLTYPE=="TCPY") %>% select(SUBJECT_ID, CONDITION, AGE, SEX, PMI, Plaque_density, CERAD, Braak_Braak_stage, NIA_Reagan,  MMSE, AD.pathology.group, SAMPLE_ID, CELLTYPE, BATCH, RIN) %>% arrange(AD.pathology.group, CONDITION) %>% write.table(file="Table.AD.TCPY.pathology.covariates.xls", sep="\t", col.names = TRUE, row.names = F, quote = F)
+left_join(x=sampleTable, y=subjectTable, by = "SUBJECT_ID") %>% filter(CELLTYPE=="TCPY") %>% 
+  select(SUBJECT_ID, CONDITION, AGE, SEX, PMI, Plaque_density, CERAD, Braak_Braak_stage, NIA_Reagan,  MMSE, AD.pathology.group, SAMPLE_ID, CELLTYPE, BATCH, RIN) %>% 
+  arrange(AD.pathology.group, CONDITION) %>% 
+  write.table(file="Table.AD.TCPY.pathology.covariates.xls", sep="\t", col.names = TRUE, row.names = F, quote = F)
 
 ## PD CSF pathology group table
-left_join(x=sampleTable, y=subjectTable, by = "SUBJECT_ID") %>% filter(CELLTYPE=="CSF") %>% select(SUBJECT_ID, CONDITION, AGE, SEX, SAMPLE_ID, CELLTYPE, BATCH) %>% arrange(CONDITION) %>% write.table(file="Table.PD.CSF.pathology.covariates.xls", sep="\t", col.names = TRUE, row.names = F, quote = F)
+left_join(x=sampleTable, y=subjectTable, by = "SUBJECT_ID") %>% filter(CELLTYPE=="CSF") %>% 
+  select(SUBJECT_ID, CONDITION, AGE, SEX, SAMPLE_ID, CELLTYPE, BATCH) %>% 
+  arrange(CONDITION) %>% 
+  write.table(file="Table.PD.CSF.pathology.covariates.xls", sep="\t", col.names = TRUE, row.names = F, quote = F)
 
-Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C CONDITION:PD:HC
-Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C CONDITION:ILB:HC
-Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C CONDITION:PD:ILB
-Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C PD.pathology.group:early:no
-Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C PD.pathology.group:late:early
-Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.AD.TCPY.pathology.covariates.xls -o DE_TCPY -O mi -C CONDITION:AD:HC
-#Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_CSF87.filtered.enriched.rawcount.rds -c Table.PD.CSF.pathology.covariates.xls -o DE_CSF -C CONDITION:PD:HC
-Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.AD.TCPY.pathology.covariates.xls -o DE_TCPY -O mi -C Braak_Braak_stage
-Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C MUSS
+#Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C CONDITION:PD:HC
+#Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C CONDITION:ILB:HC
+#Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C CONDITION:PD:ILB
+Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O Mmi -C CONDITION2:PD:HC
+#Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C PDpathologygroup:pd:hc
+#Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C PD.pathology.group:early:no
+#Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C PD.pathology.group:late:early
+#Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C PD.pathology.group:late:no
+Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.AD.TCPY.pathology.covariates.xls -o DE_TCPY -O Mmi -C CONDITION:AD:HC
+Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.AD.TCPY.pathology.covariates.xls -o DE_TCPY -O i -C Braak_Braak_stage
+Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O i -C MUSS
+
+Rscript ~/projects/circRNA/src/DE/_DE2gene.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE2gene_SNDA -O Mmi -C CONDITION2:PD:HC
+Rscript ~/projects/circRNA/src/DE/_DE2gene.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.AD.TCPY.pathology.covariates.xls -o DE2gene_TCPY -O Mmi -C CONDITION:AD:HC
+Rscript ~/projects/circRNA/src/DE/_DE2gene.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.AD.TCPY.pathology.covariates.xls -o DE2gene_TCPY -O i -C Braak_Braak_stage
+Rscript ~/projects/circRNA/src/DE/_DE2gene.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE2gene_SNDA -O i -C MUSS
+
+# CSP
+Rscript ~/projects/circRNA/src/DE/_DE2gene.R -i ../data/Merge_circexplorer_CSF87.rawcount.rds -c Table.PD.CSF.pathology.covariates.xls -o DE2gene_CSF -O Mmi -C CONDITION2:PD:HC -a ~/projects/circRNA/data/Merge_circexplorer_CSF87.annotation.bed14.rds
 
 
+## pathway analysis
+cd ~/projects/circRNA/results/DE_SNDA; Rscript ~/projects/circRNA/src/DE/_pathway.R -i DEresult.DE_SNDA.CONDITION2_PD_vs_HC.xls -F no 
+cd ~/projects/circRNA/results/DE_TCPY; Rscript ~/projects/circRNA/src/DE/_pathway.R -i DEresult.DE_TCPY.CONDITION_AD_vs_HC.xls -F no 
 
+## WGCNA analysis
+cd ~/projects/circRNA/results/DE_SNDA; Rscript ~/projects/circRNA/src/DE/_WGCNA.R -i ~/projects/circRNA/data/Merge_circexplorer_BC197.filtered.enriched.normRPM.rds -c 
 
-#### OLD
-
-
-covariate_table_url="https://docs.google.com/spreadsheets/d/e/2PACX-1vTNGgyiJHx9YItTT3bkI9F4VqYbpbrahX0RPQTiUBhtirwMhUc5bGoTYwbnkLlEkwkTkp1o9TEFQi3o/pub?gid=195725118&single=true&output=tsv" ## covariate_table in BRAINCODE_Sequencing_Log (Freeze to N=142 sample for NN paper)
-covariateTable=read.delim(textConnection(getURL(covariate_table_url)), stringsAsFactors = F)
-head(covariateTable)
-filter(covariateTable, BRAINCODE.final.selection == 1, cellType == 'SNDA', condition %in% c("HC","ILB")) %>% 
-  select(SAMPLE_ID=sampleName, SUBJECT_ID=subjectID, CONDITION=condition,	Batch=batch, RIN, PMI, Sex=sex, Age = age) %>%
-  mutate(CONDITION=ifelse(CONDITION=="HC","control","treated")) %>%
-  write.table(file="HCILB_SNDA.covariates.txt", sep="\t", col.names = TRUE, row.names = F, quote = F)
-
-## HC vs. AD in TCPY
-cd ~/projects/circRNA/results
-Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC106.filtered.enriched.rawcount.rds -c HCILB_SNDA.covariates.txt -o DE_HCvsILB_SNDA
-
+## AD vs. PD DE comparison
 
 

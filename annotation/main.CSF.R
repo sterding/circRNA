@@ -100,3 +100,36 @@ dim(Merge_circexp_norm_enriched); dim(Merge_circexp_raw_enriched); dim(annotatio
 table(annotation_enriched$circType)
 # circRNA   ciRNA 
 # 50       6 
+
+
+
+##################################
+## pilot (n=10) for grant purpose
+##################################
+Merge_circexp_raw = readRDS(file="Merge_circexplorer_CSF87.rawcount.rds")
+head(Merge_circexp_raw)
+plot(colSums(Merge_circexp_raw))
+#top10samples = names(head(sort(colSums(Merge_circexp_raw),decreasing = T),10))
+#set.seed(123); Merge_circexp_raw_pilot = Merge_circexp_raw[,sample(1:ncol(Merge_circexp_raw),10)]  # random 10 samples
+#Merge_circexp_raw_pilot = Merge_circexp_raw[,top10samples]  # first 10 samples with top depth
+Merge_circexp_raw_pilot = select(Merge_circexp_raw, contains("HC_"))  # first 10 samples with top depth
+head(Merge_circexp_raw_pilot)
+Merge_circexp_raw_pilot = Merge_circexp_raw_pilot[rowSums(Merge_circexp_raw_pilot)>=2,]
+dim(Merge_circexp_raw_pilot)
+# [1] 2496  10
+head(sort(rowSums(Merge_circexp_raw_pilot),decreasing = T),20)
+# How many are they also detected in SNDA?
+sum(rownames(Merge_circexp_raw_pilot) %in% (readRDS("../data/Merge_circexplorer_BC197.annotation.bed14.rds")$ID))
+# [1] 275
+rowSums(Merge_circexp_raw_pilot['chrX_139865339_139866824',])
+# chrX_139865339_139866824 
+# 29 
+
+## any of them in PD DE genes?
+annotation_filtered = readRDS("Merge_circexplorer_CSF87.filtered.annotation.bed14.rds")
+Merge_circexp_raw_filtered_and_enriched = readRDS(file="Merge_circexplorer_CSF87.filtered.enriched.rawcount.rds")
+DE=read.table("../results/DE_SNDA/DEresult.DE_SNDA.CONDITION2_PD_vs_HC.xls", header=T, sep="\t", row.names = 1, stringsAsFactors = F)  %>% rownames_to_column("ID")  %>% select(-contains("ind_raw")) # %>% filter(log2FoldChange>1 | log2FoldChange < -1)
+head(DE)
+# join
+inner_join(x=annotation_filtered, y=DE, by="ID")
+rowSums(Merge_circexp_raw_filtered_and_enriched['chrX_139865339_139866824',])
