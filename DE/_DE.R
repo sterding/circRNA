@@ -24,8 +24,16 @@ option_list = list(
               help="output additioal columns than DEseq2 default", metavar="character"),
   make_option(c("-C", "--comparison"), type="character", default=NULL, 
               help="Comparison in format of Variable:X:Y", metavar="character"),
+  make_option(c("-k", "--collapse"), action="store_true", default=FALSE,  
+              help="Collapse circRNAs to gene level"),
+  make_option(c("-D", "--downsize"), action="store_false", default=T,  
+              help="Downsize the insignificant genes"),
   make_option(c("-g", "--genome"), type="character", default='hg19', 
               help="Genome assembly [default=%default]", metavar="character"),
+  make_option(c("-l", "--gene_list"), type="character", default=NULL, 
+              help="The input of list [default=%default]", metavar="character"),
+  make_option(c("-t", "--gene_type"), type="character", default='circRNA', 
+              help="RNA type [gene|eRNA|circRNA] [default=%default]", metavar="character"),
   make_option(c("-a", "--annotation"), type="character", default='~/projects/circRNA/data/Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.rds', 
               help="circRNA annotation [default=%default]", metavar="character")
 ); 
@@ -39,15 +47,21 @@ output_additonal_columns=opt$output_addition_columns
 index=opt$genome
 annotation_path=opt$annotation
 comparison=opt$comparison
+COLLAPSE=opt$collapse
+DOWNSIZE=opt$downsize
+file_of_gene_list = opt$gene_list
+gene_type = opt$gene_type
 
 # debug
-# setwd("~/projects/circRNA/results/"); input_expression_filename="../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls "; output_additonal_columns='mi'; output_dir="DE_SNDA"; index="hg19"; comparison="CONDITION:PD:HC"
 # setwd("~/projects/circRNA/results/"); input_expression_filename="../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls"; output_additonal_columns='mi'; output_dir="DE_SNDA"; index="hg19"; comparison="PD.pathology.group:early:no"
 # setwd("~/projects/circRNA/results/"); input_expression_filename="../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls"; output_additonal_columns='i'; output_dir="DE_SNDA"; index="hg19"; comparison="MUSS"; annotation_path='~/projects/circRNA/data/Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.rds'
 # setwd("~/projects/circRNA/results/"); input_expression_filename="../data/Merge_circexplorer_CSF87.filtered.enriched.rawcount.rds"; input_covariance_filename="Table.PD.CSF.pathology.covariates.xls"; output_additonal_columns='mi'; output_dir="DE_CSF"; index="hg19"; comparison="CONDITION:PD:HC"; annotation_path='~/projects/circRNA/data/Merge_circexplorer_CSF87.filtered.enriched.annotation.bed14.rds'
 
 # setwd("~/projects/circRNA/results/"); input_expression_filename="../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls"; output_additonal_columns='Mi'; output_dir="DE_SNDA"; index="hg19"; comparison="CONDITION2:PD:HC"; annotation_path='~/projects/circRNA/data/Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.rds'
 # setwd("~/projects/circRNA/results/"); input_expression_filename="../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds"; input_covariance_filename="Table.AD.TCPY.pathology.covariates.xls"; output_additonal_columns='Mi'; output_dir="DE_TCPY"; index="hg19"; comparison="CONDITION:AD:HC"; annotation_path='~/projects/circRNA/data/Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.rds'
+# setwd("~/projects/circRNA/results/"); input_expression_filename="../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls"; output_additonal_columns='Mmi'; output_dir="DE2gene_SNDA"; index="hg19"; comparison="CONDITION2:PD:HC"; annotation_path='~/projects/circRNA/data/Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.rds'; COLLAPSE=TRUE
+# setwd("~/neurogen/rnaseq_PD/results/"); input_expression_filename="merged/genes.count.cuffnorm.allSamples.BCv2.uniq.xls"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls"; output_additonal_columns='Mmi'; output_dir="DE_SNDA.gene"; index="hg19"; comparison="CONDITION2:PD:HC"; gene_type='gene'
+
 
 if(is.null(comparison)){
   print_help(opt_parser)
@@ -75,6 +89,8 @@ dir.create(file.path(output_dir,'report/figures'), recursive =T, showWarnings = 
 pwd=getwd()
 setwd(output_dir)
 
+set.seed(42)
+
 # install packages
 suppressPackageStartupMessages(library('tidyverse',logical.return=T) || install.packages('tidyverse', repo='http://cran.revolutionanalytics.com'))
 suppressPackageStartupMessages(library('RCurl',logical.return=T) || install.packages('RCurl', repo='http://cran.revolutionanalytics.com'))
@@ -82,6 +98,8 @@ suppressPackageStartupMessages(library('hexbin',logical.return=T) || install.pac
 suppressPackageStartupMessages(library('pheatmap',logical.return=T) || install.packages('pheatmap', repo='http://cran.revolutionanalytics.com'))
 suppressPackageStartupMessages(library('RColorBrewer',logical.return=T) || install.packages('RColorBrewer', repo='http://cran.revolutionanalytics.com'))
 suppressPackageStartupMessages(library('hwriter',logical.return=T) || install.packages('hwriter', repo='http://cran.revolutionanalytics.com'))
+suppressPackageStartupMessages(library('ggforce',logical.return=T) || install.packages('ggforce', repo='http://cran.revolutionanalytics.com'))
+suppressPackageStartupMessages(library('ggrepel',logical.return=T) || install.packages('ggrepel', repo='http://cran.revolutionanalytics.com'))
 # source("https://bioconductor.org/biocLite.R"); 
 if (!requireNamespace("BiocManager", quietly = TRUE))  install.packages("BiocManager") # change to use bioC 3.9
 suppressPackageStartupMessages(library('vsn',logical.return=T) || BiocManager::install('vsn'));
@@ -96,26 +114,36 @@ message("#step1: load data...")
 ###########################################
 if(file.exists(file.path("DESeq2.RData"))) load(file.path("DESeq2.RData")) else {
   
-  # debug
-  # genome_name="Rattus_norvegicus"; index='rn6'; input_expression_filename='genes.htseqcount.cufflinks.allSamples.uniq.xls'; input_covariance_filename='covariate.txt'
-  
   #annotation (Note: this is downloaded from biomart, so EnsID format is ENSGxxxxx, no version number tailing)
-  genes_annotation = read.table(file.path("~/neurogen/referenceGenome",genome_name,"UCSC",index,"Annotation/Genes/annotation.genes.bed6+3"), sep="\t", quote="", header = F, stringsAsFactors = F, col.names = c("chr","start","end","geneID","score","strand","geneName","geneType","geneDescription"));
+  genes_annotation = read.table(file.path("~/neurogen/referenceGenome",genome_name,"UCSC",index,"Annotation/Genes/annotation.genes.bed6+3"), sep="\t", quote="", header = F, stringsAsFactors = F, 
+                                col.names = c("chr","start","end","geneID","score","strand","geneName","geneType","geneDescription"));
   
   ## for circRNAs
-  if(tolower(tools::file_ext(annotation_path)) == "rds") {
-    circRNA_annotation=readRDS(file.path(annotation_path))
-  }else circRNA_annotation=read.delim(file.path(annotation_path), header = T, row.names = 1,check.names =F)
-  circRNA_annotation$geneDescription = genes_annotation$geneDescription[match(sub("\\..*","", circRNA_annotation$geneID), genes_annotation$geneID)]
-  circRNA_annotation$geneDescription = sub(" \\[Source:.*","", circRNA_annotation$geneDescription)
-  genes_annotation = circRNA_annotation
-  
+  if(gene_type=='circRNA'){
+    if(tolower(tools::file_ext(annotation_path)) == "rds") {
+      circRNA_annotation=readRDS(file.path(annotation_path))
+    }else circRNA_annotation=read.delim(file.path(annotation_path), header = T, row.names = 1,check.names =F)
+    circRNA_annotation$geneDescription = genes_annotation$geneDescription[match(sub("\\..*","", circRNA_annotation$geneID), genes_annotation$geneID)]
+    circRNA_annotation$geneDescription = sub(" \\[Source:.*","", circRNA_annotation$geneDescription)
+    genes_annotation = select(circRNA_annotation, ID, circType, geneID, geneName, geneType, geneDescription)
+  }
+  if(gene_type=='gene') genes_annotation=mutate(genes_annotation, ID=geneID) %>% select(ID, everything())
+
   # raw reads count
   if(tolower(tools::file_ext(input_expression_filename)) == "rds") {
     cts=readRDS(file.path(pwd,input_expression_filename))
   }else cts=read.delim(file.path(pwd,input_expression_filename), row.names = 1,check.names =F)
   # remove those non-geneID rows, e.g. __no_feature (pre-mRNA reads) and __ambiguous (see http://htseq.readthedocs.io/en/master/count.html )
   dim(cts); cts=cts[grep("^__", rownames(cts), invert = T),]; dim(cts);
+  # remove the version number in geneID
+  rownames(cts) = sub("(^ENS.*)\\..*","\\1",rownames(cts))
+  
+  ## collapse circRNA to gene, e.g. circDNAJC6, like Dube et al. Nature Neurosicen 2019. Reason: https://stat.ethz.ch/pipermail/bioconductor/2012-February/043410.html
+  if(COLLAPSE && gene_type=='circRNA'){
+    genes_annotation = mutate(genes_annotation, circID=paste0(sub("RNA","",as.character(circType)),as.character(geneName)))
+    dim(cts);  cts = rownames_to_column(cts) %>% mutate(rowname=genes_annotation$circID[match(rowname, genes_annotation$ID)]) %>% group_by(rowname) %>% summarise_all(sum) %>% column_to_rownames(); dim(cts)
+    genes_annotation = mutate(genes_annotation,ID=circID) %>% select(-circID) %>% distinct()
+  }
   
   # covariance table
   covarianceTable = read.table(file.path(pwd,input_covariance_filename), sep="\t", header = T,check.names =F, stringsAsFactors = F)
@@ -158,6 +186,8 @@ if(file.exists(file.path("DESeq2.RData"))) load(file.path("DESeq2.RData")) else 
   #fmla <- names(covarianceTable)[!names(covarianceTable) %in% c("SAMPLE_ID", "SUBJECT_ID")]
   #fmla <- as.formula(paste(" ~ ", paste(fmla, collapse= "+")))
   
+  if(sum(apply(cts, 1, min))==0) cts=cts+1; # to avoid 0 geometric mean (https://help.galaxyproject.org/t/error-with-deseq2-every-gene-contains-at-least-one-zero/564/2)
+  
   dds <- DESeqDataSetFromMatrix(countData = cts,
                                 colData = covarianceTable,
                                 design= ~ 1)
@@ -177,14 +207,14 @@ if(file.exists(file.path("DESeq2.RData"))) load(file.path("DESeq2.RData")) else 
   # Note: This part is not necessary for DEseq, but important for data QA
   
   ##--------------------------------------
-  ## 3.1: compare different vairance stablization methods
+  message("## 3.1: compare different vairance stablization methods")
   ##--------------------------------------
   
   ntd <- normTransform(dds) # log2(x+1)
   vsd <- varianceStabilizingTransformation(dds, blind=T) # Note: blind to the design, equal to design = ~ 1
   
   # # using limma to remove covariates, it returns adjusted values in log2 scale
-  vsd_adjusted_log2 <- removeBatchEffect(assay(vsd), batch=vsd$BATCH, batch2=vsd$SEX, covariates = colData(vsd)[,c('AGE','PMI','RIN')])
+  vsd_adjusted_log2 <- removeBatchEffect(assay(vsd), batch=vsd$BATCH, batch2=vsd$SEX, covariates = colData(vsd)[,colnames(colData(vsd)) %in% c('AGE','PMI','RIN')])
   
   pdf("diagnosis.pdf")
   par(mar=c(10,5,3,3));boxplot(assay(ntd), las=2, cex.axis=.7, ylab="log2(x+1) transform")
@@ -208,24 +238,24 @@ if(file.exists(file.path("DESeq2.RData"))) load(file.path("DESeq2.RData")) else 
   }
   
   ##--------------------------------------
-  ## 3.2: save normalized reads count
+  message("## 3.2: save normalized reads count")
   ##--------------------------------------
   
-  ## save the raw reads count 
-  write.table(counts(dds), 
-              file=paste0(basename(input_expression_filename), ".filtered.raw.xls"), 
-              sep="\t", quote = F, 
-              col.names = NA, row.names = TRUE)
-  ## save the variance-stabilized data
-  write.table(assay(vsd), 
-              file=paste0(basename(input_expression_filename), ".filtered.vsd.xls"), 
-              sep="\t", quote = F, 
-              col.names = NA, row.names = TRUE)
-  ## save the vsd adjusted
-  write.table(vsd_adjusted_log2,
-              file=paste0(basename(input_expression_filename), ".filtered.vsd_adjusted_log2.xls"),
-              sep="\t", quote = F,
-              col.names = NA, row.names = TRUE)
+  # ## save the raw reads count 
+  # write.table(counts(dds), 
+  #             file=paste0(basename(input_expression_filename), ".filtered.raw.xls"), 
+  #             sep="\t", quote = F, 
+  #             col.names = NA, row.names = TRUE)
+  # ## save the variance-stabilized data
+  # write.table(assay(vsd), 
+  #             file=paste0(basename(input_expression_filename), ".filtered.vsd.xls"), 
+  #             sep="\t", quote = F, 
+  #             col.names = NA, row.names = TRUE)
+  # ## save the vsd adjusted
+  # write.table(vsd_adjusted_log2,
+  #             file=paste0(basename(input_expression_filename), ".filtered.vsd_adjusted_log2.xls"),
+  #             sep="\t", quote = F,
+  #             col.names = NA, row.names = TRUE)
   
   DDS=dds
   save(genes_annotation, covarianceTable, DDS, vsd, vsd_adjusted_log2, file="DESeq2.RData")
@@ -236,11 +266,11 @@ makeNewImages <- function(df,...){
   imagename <- c()
   tablename <- c()
   for (i in 1:nrow(df)){
-    ensId <- df$circID[i]
-    geneName <- df$geneName[i]    
+    ensId <- df$ID[i]
+    geneDescription <- df$geneDescription[i]    
     pvalue <- df$pvalue[i]
-    imagename[i] <- paste('plot', ensId, geneName, variable, 'pdf', sep = ".")
-    tablename[i] <- paste('plot', ensId, geneName, variable, 'txt', sep = ".")
+    imagename[i] <- paste('plot', ensId, df$geneName[i], variable, 'pdf', sep = ".")
+    tablename[i] <- paste('plot', ensId, df$geneName[i], variable, 'txt', sep = ".")
     
     message(paste(" # processing", ensId))
     
@@ -265,13 +295,13 @@ makeNewImages <- function(df,...){
           geom_boxplot(position=position_dodge(.8), width=.5, outlier.shape = NA) +
           geom_jitter(size=1.5, position = position_jitter(width=.15)) +
           theme_bw() +
-          xlab(variable) + ylab("log2(normalized adjusted expression)") + ggtitle(geneName,subtitle = ensId)
+          xlab(variable) + ylab("log2(normalized adjusted expression)") + ggtitle(ensId, subtitle = geneDescription)
       }else{
         N=3; # random number to make a nearly square figure
         p=ggplot(d, aes_string(x=variable, y="expression_log2vsd")) + 
           geom_jitter(size=1.5, position = position_jitter(width=.15)) +
           theme_bw() +
-          xlab(variable) + ylab("log2(normalized adjusted expression)") + ggtitle(geneName,subtitle = ensId)
+          xlab(variable) + ylab("log2(normalized adjusted expression)") + ggtitle(ensId, subtitle = geneDescription)
       }
       #png(file.path('report/figures', imagename[i]), height = 250, width = 600)
       pdf(file.path('report/figures', imagename[i]), height = 4, width = 1.5*N)
@@ -286,9 +316,9 @@ makeNewImages <- function(df,...){
   df$Boxplot <- hwrite('boxplot', link = paste0('figures/', imagename), table=F)
   df$Rawdata <- hwrite("data", link = paste0('figures/', tablename), table=F)
   df$geneName <- hwrite(as.character(df$geneName), 
-                      #link = paste0("http://useast.ensembl.org/",genome_name,"/Gene/Summary?db=core;g=",as.character(df$geneName)), 
-                      link = paste0("https://www.genecards.org/cgi-bin/carddisp.pl?gene=",as.character(df$geneName)), 
-                      table=F)
+                        #link = paste0("http://useast.ensembl.org/",genome_name,"/Gene/Summary?db=core;g=",as.character(df$geneName)), 
+                        link = paste0("https://www.genecards.org/cgi-bin/carddisp.pl?gene=",as.character(df$geneName)), 
+                        table=F)
   return(df)
 }
 
@@ -305,13 +335,19 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   dim(dds); dds <- dds[keep,]; dim(dds);
   
   # factorize
-  covariances=c('AGE', 'RIN', 'PMI');
+  covariances=c();
+  for(i in c('AGE', 'RIN', 'PMI')) if(i %in% colnames(covarianceTable) & !(i %in% covariances)) {covariances=c(covariances,i);}
   for(i in c('SEX', 'BATCH', 'CELLTYPE')) if(i %in% colnames(covarianceTable) & !(i %in% covariances)) {dds[[i]] <- droplevels(dds[[i]]); if(length(levels(dds[[i]]))>1) covariances=c(covariances,i);}
+  
+  #message(paste(covariances))
   
   design(dds) <- as.formula(paste(" ~ ", paste(c(covariances, variable), collapse= " + ")))
   
   # Use the similar setting for single-cell RNAseq, since circRNA data here is also in ZINB distribution. See http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#recommendations-for-single-cell-analysis
-  dds <- DESeq(dds, sfType="poscounts", useT=TRUE, minmu=1e-6)
+  if(gene_type=='circRNA')
+    dds <- DESeq(dds, sfType="poscounts", useT=TRUE, minmu=1e-6)
+  if(gene_type=='gene')
+    dds <- DESeq(dds)
   
   # We tried LRT test (similar to ANOVA) below. See http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#likelihood-ratio-test
   # It turned out LRT produced less number of DE genes. So we sticked back to Wald test (to test the null hypothesis of log2FC==0)
@@ -335,7 +371,8 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   res$FoldChange <- 2**res$log2FoldChange
   
   # add annotation
-  res <- cbind(res, genes_annotation[match(sub("\\..*","",row.names(res)), genes_annotation$ID), c('circType','geneName','geneType','geneDescription')])
+  res <- cbind(res, genes_annotation[match(row.names(res), genes_annotation$ID), -1])
+  
   
   # add additional columns in the output
   if(!is.null(output_additonal_columns) && grepl("i", output_additonal_columns)){ # individual raw expression values of each sample 
@@ -357,71 +394,82 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   
   # write to xls
   write.table(as.data.frame(res), 
-              file=file.path(paste("DEresult",output_dir,com_name ,"xls",sep=".")), 
+              file=paste("DEresult",output_dir,com_name ,"xls",sep="."), 
               sep="\t", quote =F, na="", row.names=T, col.names = NA)
+  system(paste("gzip DEresult",output_dir,com_name ,"xls",sep="."))
   
-  DE = subset(res, !is.na(pvalue) & pvalue<=0.05 & abs(log2FoldChange)>=1)
-  NDE = subset(res, pvalue>0.05 | abs(log2FoldChange)<1)
+  ## pvalue cutoff
+  PVALUE_CUTOFF = ifelse(isEmpty(res$pvalue[res$padj<=0.05]), 0.05, max(res$pvalue[res$padj<=0.05],na.rm = T))  # either the pvalue corresponding to FDR=0.05 or just 0.05
+  
+  DE  = subset(res, !is.na(pvalue) & pvalue <= PVALUE_CUTOFF & abs(log2FoldChange)>=1)
+  DE2 = subset(res, !is.na(pvalue) & pvalue <= PVALUE_CUTOFF & abs(log2FoldChange)<1)
+  NDE = subset(res, pvalue > PVALUE_CUTOFF)
+  
   # ## Note: 20% of non-significant(NS) genes are randomly selected in order to increase the performance of the generating graph
-  if(nrow(NDE)>5000){
+  if(nrow(NDE)>5000 && DOWNSIZE){
     n_NS=nrow(NDE)
     NDE=NDE[sample(n_NS,round(n_NS * .20)),]
-    dim(res); res=DESeqResults(rbind(NDE, DE)); dim(res);
+    dim(res); res=DESeqResults(rbind(NDE, DE2, DE)); dim(res);
   }
+  res <- res[order(res$pvalue),]
   
   ## MAKING PLOTS
   pdf(file.path(paste("DEresult",output_dir, com_name ,"pdf", sep = ".")), paper = 'USr')
   ## ==============================
   # MA plot
   ## ==============================
-  #DESeq2::plotMA(DESeqResults(res), alpha = 0.05, colNonSig = "gray", main=paste0(output_dir,": ",com_name))
+  #DESeq2::plotMA(DESeqResults(res), alpha = PVALUE_CUTOFF, colNonSig = "gray", main=paste0(output_dir,": ",com_name))
   
   RES=as.data.frame(res)
   DE =as.data.frame(DE)
+  DE2 =as.data.frame(DE2)
   
   ## ==============================
   # vocano plot
   ## ==============================
-  with(RES, plot(log2FoldChange, -log10(pvalue), 
-                 pch=20, cex=0.5, main=paste0(output_dir,": ",com_name), col='gray',
-                 xlab=bquote(~Log[2]~fold~change), 
-                 ylab=bquote(~-log[10]~pvalue)))
-  if(nrow(DE)>0) {
-    with(DE, points(log2FoldChange, -log10(pvalue), pch=20, col="red", cex=1))
-    with(DE, text(log2FoldChange, -log10(pvalue), labels=geneName, cex=0.5, pos=1, offset=0.2))
-  }
-  abline(v=c(0,-1, 1), lty=c(3,4,4), lwd=1)
-  abline(h=-log10(0.05), col="black", lty=4, lwd=1)
-  
+  p=ggplot(RES, aes(x=log2FoldChange, y=-log10(pvalue), label=geneName)) +
+    geom_point(color = ifelse(RES$pvalue > PVALUE_CUTOFF, "gray", if(gene_type=="circRNA") ifelse(RES$circType=='circRNA',"red", "orange") else ifelse(RES$geneType=='protein_coding',"red", "orange")), size=3) +
+    geom_hline(yintercept = -log10(PVALUE_CUTOFF), color='black', size=.5, linetype = 2) + 
+    geom_vline(xintercept = c(0,-1, 1), color=c('black','gray','gray'), size=.5, linetype = 2) +
+    labs(title=paste0(output_dir,": ",com_name)) +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+    geom_text_repel(
+      data          = head(subset(RES, pvalue <= PVALUE_CUTOFF),50),
+      nudge_y       = 0,
+      vjust         = 1,
+      segment.size  = 0.2,
+      segment.color = "grey50") 
+  print(p)
   
   ## ==============================
-  message("# heatmap for top 10 DE genes")
+  message("# heatmap for top 20 DE genes")
   ## ==============================
   RES=RES[order(RES$pvalue),] # sort by padj in increasing order
   DE10=rbind(head(subset(RES, log2FoldChange<0),20),head(subset(RES, log2FoldChange>0),20)) # top 10 down-regulated and top 10 up-regulated
-
-  topDE=vsd_adjusted_log2[rownames(DE10),rownames(colData(dds))]; 
-  rownames(topDE) = paste(DE10$geneName, rownames(topDE), sep=".")
   
-  annotation_row = dplyr::select(DE10, circType,geneType, log2FoldChange, baseMean, geneName) %>% rownames_to_column() %>% 
-    mutate(updown=ifelse(log2FoldChange>0,"up","down"), rowname=paste(geneName, rowname, sep=".")) %>% 
-    arrange(updown, log2FoldChange) %>% select(rowname, updown) %>% column_to_rownames()
+  topDE=vsd_adjusted_log2[rownames(DE10),rownames(colData(dds))]; 
+  if(!COLLAPSE) rownames(topDE) = paste(DE10$geneName, rownames(topDE), sep=".")
+  
+  annotation_row = dplyr::select(DE10, one_of(c('circType','geneType', 'pvalue', 'log2FoldChange', 'baseMean', 'geneName'))) %>% rownames_to_column() %>% 
+    rowwise() %>% mutate(updown=ifelse(log2FoldChange>0,"up","down"), rowname=ifelse(COLLAPSE, rowname, paste(geneName, rowname, sep="."))) %>% 
+    arrange(updown, log2FoldChange) %>% select(rowname, one_of('updown','circType','geneType')) %>% column_to_rownames()
   
   annotation_col = dplyr::select(as.data.frame(colData(dds)), variable) %>% rownames_to_column() %>% 
     arrange(!!as.name(variable)) %>% column_to_rownames()
   
   # reorder topDE
   topDE=topDE[rownames(annotation_row), rownames(annotation_col)]
-
+  
   ann_colors = list(
     updown = c(up = "red", down = "blue"),
-    circType = c(circRNA = "red", ciRNA = "orange"),
-    geneType = c(protein_coding = "darkblue", lincRNA = "orange", Mt_rRNA='pink', 
-                 antisense='yellow', pseudogene='gray', processed_transcript='lightgray')
-  )
-  #tmp=c("green","red"); names(tmp)=c(variable_REF, variable_ALT);
-  #ann_colors=c(list(tmp), ann_colors); names(ann_colors)[1]=variable
+    circType = c(circRNA = "red", ciRNA = "orange"))
   
+  ## add color for geneType
+  genetypes = sort(table(as.character(RES$geneType)), decreasing = T)
+  genetypes = setNames(colorRampPalette(brewer.pal(9, "Set1"))(length(genetypes)), names(genetypes))
+  ann_colors = c(geneType = list(genetypes), ann_colors)
+
   ## Scale/center each genes (by rows)
   topDE=t(scale(t(as.matrix(topDE))))
   ## trim max and min
@@ -450,16 +498,18 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
            cluster_cols = F,
            clustering_distance_cols = "correlation")
   
-  if(nrow(DE)>1){
+  DE0 = rbind(DE,DE2)
+  
+  if(nrow(DE0)>1){
     ## ==============================
-    message("# heatmap for all DE genes")
+    message(paste("# heatmap for all DE genes (p <=", format.pval(PVALUE_CUTOFF,3), ")"))
     ## ==============================
-    topDE=vsd_adjusted_log2[rownames(DE),rownames(colData(dds))]; 
-    rownames(topDE) = paste(DE$geneName, rownames(topDE), sep=".")
+    topDE=vsd_adjusted_log2[rownames(DE0),rownames(colData(dds))]; 
+    if(!COLLAPSE) rownames(topDE) = paste(DE0$geneName, rownames(topDE), sep=".")
     
-    annotation_row = dplyr::select(DE, circType,geneType, log2FoldChange, baseMean, geneName) %>% rownames_to_column() %>% 
-      mutate(updown=ifelse(log2FoldChange>0,"up","down"), rowname=paste(geneName, rowname, sep=".")) %>% 
-      arrange(updown, log2FoldChange) %>% select(rowname, updown) %>% column_to_rownames()
+    annotation_row = dplyr::select(DE0, one_of(c('circType','geneType', 'pvalue', 'log2FoldChange', 'baseMean', 'geneName'))) %>% rownames_to_column() %>% 
+      rowwise() %>% mutate(updown=ifelse(log2FoldChange>0,"up","down"), rowname=ifelse(COLLAPSE, rowname, paste(geneName, rowname, sep=".")), updownP=ifelse(log2FoldChange>0,pvalue,-1*pvalue),) %>% 
+      arrange(updown, -updownP) %>% select(rowname, one_of('updown','circType','geneType')) %>% column_to_rownames()
     
     annotation_col = dplyr::select(as.data.frame(colData(dds)), variable) %>% rownames_to_column() %>% 
       arrange(!!as.name(variable)) %>% column_to_rownames()
@@ -469,10 +519,12 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
     
     ann_colors = list(
       updown = c(up = "red", down = "blue"),
-      circType = c(circRNA = "red", ciRNA = "orange"),
-      geneType = c(protein_coding = "darkblue", lincRNA = "orange", Mt_rRNA='pink', 
-                   antisense='yellow', pseudogene='gray', processed_transcript='lightgray')
-    )
+      circType = c(circRNA = "red", ciRNA = "orange"))
+    
+    ## add color for geneType
+    genetypes = sort(table(as.character(DE0$geneType)), decreasing = T)
+    genetypes = setNames(colorRampPalette(brewer.pal(9, "Set1"))(length(genetypes)), names(genetypes))
+    ann_colors = c(geneType = list(genetypes), ann_colors)
     
     ## Scale/center each genes (by rows)
     topDE=t(scale(t(as.matrix(topDE))))
@@ -485,7 +537,7 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
     
     par(cex=0.5, mar=c(5, 8, 4, 1))
     pheatmap(topDE,
-             main =paste0(output_dir,": heatmap for all DE genes"),
+             main =paste0(output_dir,": heatmap for all DE genes (p <=", format.pval(PVALUE_CUTOFF,3), ")"),
              fontsize = 5,
              border_color = NA,
              color = colorRampPalette(c("lightblue", "white", "red"))(50),
@@ -504,12 +556,97 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
              clustering_distance_cols = "correlation")
   }
   
+  ## for input list of genes
+  if(!is.null(file_of_gene_list) && file.exists(file_of_gene_list)){
+    ## ==============================
+    message("# heatmap for the input list of genes")
+    ## ==============================
+    geneList = scan(file = file_of_gene_list)
+    topDE=vsd_adjusted_log2[geneList,rownames(colData(dds))]; 
+    if(!COLLAPSE) rownames(topDE) = paste(RES[geneList,'geneName'], rownames(topDE), sep=".")
+    
+    annotation_row = dplyr::select(RES[geneList,], one_of(c('circType','geneType', 'pvalue', 'log2FoldChange', 'baseMean', 'geneName'))) %>% rownames_to_column() %>% 
+      rowwise() %>% mutate(updown=ifelse(log2FoldChange>0,"up","down"), rowname=ifelse(COLLAPSE, rowname, paste(geneName, rowname, sep=".")), updownP=ifelse(log2FoldChange>0,pvalue,-1*pvalue),) %>% 
+      arrange(updown, -updownP) %>% select(rowname, one_of('updown','circType','geneType')) %>% column_to_rownames()
+    
+    annotation_col = dplyr::select(as.data.frame(colData(dds)), variable) %>% rownames_to_column() %>% 
+      arrange(!!as.name(variable)) %>% column_to_rownames()
+    
+    # reorder topDE
+    topDE=topDE[rownames(annotation_row), rownames(annotation_col)]
+    
+    ann_colors = list(
+      updown = c(up = "red", down = "blue"),
+      circType = c(circRNA = "red", ciRNA = "orange"))
+    
+    ## add color for geneType
+    genetypes = sort(table(as.character(RES[geneList,'geneType'])), decreasing = T)
+    genetypes = setNames(colorRampPalette(brewer.pal(9, "Set1"))(length(genetypes)), names(genetypes))
+    ann_colors = c(geneType = list(genetypes), ann_colors)
+    
+    ## Scale/center each genes (by rows)
+    topDE=t(scale(t(as.matrix(topDE))))
+    
+    ## trim max and min
+    MAX=2; MIN=-2; topDE[topDE>MAX]=MAX;topDE[topDE<MIN]=MIN
+    
+    ## add noise to avoid SD=0 cases
+    #topDE=topDE + matrix(rnorm(prod(dim(topDE)),0,0.01),nrow = nrow(topDE),ncol = ncol(topDE))
+    
+    par(cex=0.5, mar=c(5, 8, 4, 1))
+    pheatmap(topDE,
+             main =paste0(output_dir,": heatmap for the input list of genes"),
+             fontsize = 5,
+             border_color = NA,
+             color = colorRampPalette(c("lightblue", "white", "red"))(50),
+             annotation_row = annotation_row,
+             annotation_col = annotation_col,
+             annotation_colors = ann_colors,
+             drop_levels = TRUE,
+             scale = "none", 
+             clustering_method = 'ward.D', 
+             cluster_rows = F,
+             clustering_distance_rows = "correlation",
+             gaps_row = as.vector(table(annotation_row$updown))[1],
+             #cutree_rows = 2,
+             #cutree_cols=2,
+             cluster_cols = F,
+             clustering_distance_cols = "correlation")
+  }
+  
+  message("# violin plots between the groups")
+  
+  if(nrow(DE0)>0){
+    individual <- counts(dds,normalized=TRUE)[rownames(DE0),]
+    colnames(individual) = dds[[variable]]
+    
+    df = rownames_to_column(as.data.frame(individual)) %>% gather(key=variable, value = "norm_expressed", -1) %>% 
+      mutate(!!variable := gsub("(.*)\\..*","\\1",variable)) # %>% # filter(rowname=='chr13_78293666_78320990')
+    
+    # remove NA
+    df=df[!is.na(df[[variable]]),]
+    df=df[!is.na(df$norm_expressed),]
+    df=df[!is.na(df$rowname),]
+    
+    for(i in 1:ceiling(length(unique(df$rowname))/16)){
+      p = ggplot(df, aes_string(x=variable, y="norm_expressed")) + 
+        geom_violin(trim=FALSE, fill="gray")+
+        geom_boxplot(width=0.1)+
+        scale_y_log10() + 
+        facet_wrap_paginate(~rowname, nrow = 4, ncol = 4, page = i, scales='free') + 
+        labs(title="Plot of expression by case and control",x="Groups", y = "Normalized expression")+
+        theme_classic() 
+      class(p) <- c('gg_multiple', class(p))
+      print(p)
+    }
+  }
+  
   dev.off() 
   
   message("## Exporting results to HTML")
   htmlRep <- HTMLReport(shortName=com_name, title=com_name,
                         reportDirectory="report")
-  publish(makeNewImages(rownames_to_column(RES, var="circID") %>% dplyr::select(starts_with("circ"), starts_with("baseMean"), log2FoldChange, pvalue, padj, geneName, geneType, geneDescription)), htmlRep)
+  publish(makeNewImages(rownames_to_column(DE0, var="ID") %>% dplyr::select(ID, starts_with("circ"), starts_with("baseMean"), log2FoldChange, pvalue, padj, geneName, geneType, geneDescription)), htmlRep)
   finish(htmlRep)
   
   
@@ -527,7 +664,8 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   levels(dds[[variable]]) = union(variable_REF, levels(dds[[variable]])) # put the REF in the first in the levels
   
   # factorize
-  covariances=c('AGE', 'RIN', 'PMI');
+  covariances=c();
+  for(i in c('AGE', 'RIN', 'PMI')) if(i %in% colnames(covarianceTable) & !(i %in% covariances)) {covariances=c(covariances,i);}
   for(i in c('SEX', 'BATCH', 'CELLTYPE', variable)) if(i %in% colnames(covarianceTable) & !(i %in% covariances)) {dds[[i]] <- droplevels(dds[[i]]); if(length(levels(dds[[i]]))>1) covariances=c(covariances,i);}
   
   str(colData(dds))
@@ -535,7 +673,10 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   design(dds) <- as.formula(paste(" ~ ", paste(covariances, collapse= " + ")))
   
   # Zero-inflated NB distribution, Wald test
-  dds <- DESeq(dds, sfType="poscounts", useT=TRUE, minmu=1e-6, parallel=TRUE, BPPARAM=MulticoreParam(4))
+  if(gene_type=='circRNA')
+    dds <- DESeq(dds, sfType="poscounts", useT=TRUE, minmu=1e-6, parallel=TRUE, BPPARAM=MulticoreParam(4))
+  if(gene_type=='gene')
+    dds <- DESeq(dds, parallel=TRUE, BPPARAM=MulticoreParam(4))
   
   com_name= paste(variable, variable_ALT, "vs", variable_REF, sep="_")
   message(paste("processing comparison:",com_name))
@@ -550,13 +691,16 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   ## The difference is that betaPrior=TRUE will give you a p-value for the shrunken LFC, while lfcShrink (at the moment) is only giving you the LFC, and is keeping the p-value for the test of the MLE LFC. 
   ## see https://support.bioconductor.org/p/95695/ and https://support.bioconductor.org/p/98833/#98843
   
+  #Note: the independant filtering is applied by default, with the mean norm count is less than the threshold (which has the max H0 rejection, or max power, in the H0 reject vs theta plot). 
+  # The adjusted p-values for the genes which do not pass the filter threshold are set to NA.  https://support.bioconductor.org/p/76144/#76147
+    
   summary(res)
   head(res); dim(res)
   # decimal value of Fold-change
   res$FoldChange <- 2**res$log2FoldChange
   
   # add annotation
-  res <- cbind(res, genes_annotation[match(sub("\\..*","",row.names(res)), genes_annotation$ID), c('circType','geneName','geneType','geneDescription')])
+  res <- cbind(res, genes_annotation[match(row.names(res), genes_annotation$ID), -1])
   
   # add additional columns in the output
   if(!is.null(output_additonal_columns) && grepl("m", output_additonal_columns)){ # mean of raw expression values for each group, 
@@ -588,17 +732,23 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   
   # write to xls
   write.table(as.data.frame(res), 
-              file=file.path(paste("DEresult",output_dir,com_name ,"xls",sep=".")), 
+              file=paste("DEresult",output_dir,com_name ,"xls",sep="."), 
               sep="\t", quote =F, na="", row.names=T, col.names = NA)
+  system(paste("gzip DEresult",output_dir,com_name ,"xls",sep="."))
   
-  DE = subset(res, !is.na(pvalue) & pvalue<=0.05 & abs(log2FoldChange)>=1)
-  DE2 = subset(res, !is.na(pvalue) & pvalue<=0.05 & abs(log2FoldChange)<1)  
-  NDE = subset(res, pvalue>0.05)
+  ## pvalue cutoff
+  PVALUE_CUTOFF = ifelse(isEmpty(res$pvalue[res$padj<=0.05]), 0.05, max(res$pvalue[res$padj<=0.05],na.rm = T))  # either the pvalue corresponding to FDR=0.05 or just 0.05
+  
+  DE  = subset(res, !is.na(pvalue) & pvalue <= PVALUE_CUTOFF & abs(log2FoldChange)>=1)
+  DE2 = subset(res, !is.na(pvalue) & pvalue <= PVALUE_CUTOFF & abs(log2FoldChange)<1)  
+  NDE = subset(res, pvalue > PVALUE_CUTOFF)
+
   # ## Note: 20% of non-significant(NS) genes are randomly selected in order to increase the performance of the generating graph
-  if(nrow(NDE)>5000){
+  if(nrow(NDE)>5000 && DOWNSIZE){
     n_NS=nrow(NDE)
     NDE=NDE[sample(n_NS,round(n_NS * .20)),]
-    dim(res); res=DESeqResults(rbind(NDE, DE2, DE)); dim(res);
+    dim(res); res=DESeqResults(rbind(DE, DE2, NDE)); dim(res);
+    res <- res[order(res$pvalue),]
   }
   
   ## MAKING PLOTS
@@ -606,7 +756,7 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   ## ==============================
   # MA plot
   ## ==============================
-  #DESeq2::plotMA(DESeqResults(res), alpha = 0.05, colNonSig = "gray", main=paste0(output_dir,": ",com_name))
+  #DESeq2::plotMA(DESeqResults(res), alpha = PVALUE_CUTOFF, colNonSig = "gray", main=paste0(output_dir,": ",com_name))
   
   RES=as.data.frame(res)
   DE =as.data.frame(DE)
@@ -617,32 +767,32 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
     REF=paste0("baseMean_norm.", variable_REF); ALT=paste0("baseMean_norm.", variable_ALT)
     plot(jitter(RES[[REF]])+1, jitter(RES[[ALT]])+1, 
          log='xy', pch=19, cex=1, cex.axis=2, cex.lab=2,
-         xlab=REF,ylab=ALT,
+         xlab=REF,ylab=ALT,main= paste0(output_dir,": ",com_name),
          xlim=range(RES[[REF]], RES[[ALT]])+1, 
          ylim=range(RES[[REF]], RES[[ALT]])+1, 
-         col=ifelse(RES$circType=="ciRNA",'orange','red'))
-    RES0=RES[RES[[REF]]>=5 | RES[[ALT]]>=5,]
-    text(x=1+RES0[[REF]], y=1+RES0[[ALT]], labels = RES0$geneName, cex=.5, adj=c(0.5,0), pos=3);
+         col=if(gene_type=='circRNA') ifelse(RES$circType=="circRNA",'red','orange') else ifelse(RES$geneType=="protein_coding",'red','orange'))
+    RES0=RES[RES[[REF]]>=max(RES[[REF]], RES[[ALT]])/3 | RES[[ALT]]>=max(RES[[REF]], RES[[ALT]])/3,]
+    text(x=1+RES0[[REF]], y=1+RES0[[ALT]], labels = RES0$geneName, cex=.5, adj=c(0.5,0), pos=3, offset = .3);
     abline(a=0,b=1, lty=2, col='black')
   }
   
   ## ==============================
   # vocano plot
   ## ==============================
-  with(RES, plot(log2FoldChange, -log10(pvalue), 
-                 pch=20, cex=1, main=paste0(output_dir,": ",com_name), col='darkgray',
-                 xlab=bquote(~Log[2]~fold~change), 
-                 ylab=bquote(~-log[10]~pvalue)))
-  if(nrow(DE)>0) {
-    with(DE, points(log2FoldChange, -log10(pvalue), pch=20, col="red", cex=1))
-    with(DE, text(log2FoldChange, -log10(pvalue), labels=geneName, cex=0.6, pos=1, offset=0.2))
-  }
-  if(nrow(DE2)>0) {
-    with(DE2, points(log2FoldChange, -log10(pvalue), pch=20, col="orange", cex=.8))
-    with(DE2, text(log2FoldChange, -log10(pvalue), labels=geneName, cex=0.5, pos=1, offset=0.2))
-  }
-  abline(v=c(0,-1, 1), lty=c(3,4,4), lwd=c(1,1,1))
-  abline(h=-log10(0.05), col="black", lty=4, lwd=1)
+  p=ggplot(RES, aes(x=log2FoldChange, y=-log10(pvalue), label=geneName)) +
+    geom_point(color = ifelse(RES$pvalue > PVALUE_CUTOFF, "gray", if(gene_type=="circRNA") ifelse(RES$circType=='circRNA',"red", "orange") else ifelse(RES$geneType=='protein_coding',"red", "orange")), size=3) +
+    geom_hline(yintercept = -log10(PVALUE_CUTOFF), color='black', size=.5, linetype = 2) + 
+    geom_vline(xintercept = c(0,-1, 1), color=c('black','gray','gray'), size=.5, linetype = 2) +
+    labs(title=paste0(output_dir,": ",com_name)) +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+    geom_text_repel(
+      data          = head(subset(RES, pvalue <= PVALUE_CUTOFF),50),
+      nudge_y       = 0,
+      vjust         = 1,
+      segment.size  = 0.2,
+      segment.color = "grey50")
+  print(p)
   
   ## ==============================
   message("# heatmap for top 20 DE genes")
@@ -652,32 +802,33 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   RES=RES[order(RES$pvalue),] # sort by padj in increasing order
   DE10=rbind(head(subset(RES, log2FoldChange<0),20),head(subset(RES, log2FoldChange>0),20)) # top 10 down-regulated and top 10 up-regulated
   
-  topDE=vsd_adjusted_log2[rownames(DE10),rownames(colData(dds))]; 
-  #topDE=assay(vsd)[rownames(DE10),rownames(colData(dds))]
-  rownames(topDE) = paste(DE10$geneName, rownames(topDE), sep=".")
+  #topDE=vsd_adjusted_log2[rownames(DE10),rownames(colData(dds))]; 
+  topDE=assay(vsd)[rownames(DE10),rownames(colData(dds))]
+  if(!COLLAPSE) rownames(topDE) = paste(DE10$geneName, rownames(topDE), sep=".")
   
-  message(paste("====debug====:", nrow(topDE)))
-
-  annotation_row = dplyr::select(DE10, circType,geneType, log2FoldChange, baseMean, geneName) %>% rownames_to_column() %>% 
-    mutate(updown=ifelse(log2FoldChange>0,"up","down"), rowname=paste(geneName, rowname, sep=".")) %>% 
-    arrange(updown, log2FoldChange) %>% select(rowname, updown) %>% column_to_rownames()
+  annotation_row = dplyr::select(DE10, one_of('circType','geneType', 'pvalue', 'log2FoldChange', 'baseMean', 'geneName')) %>% rownames_to_column() %>% 
+    rowwise() %>% mutate(updown=ifelse(log2FoldChange>0,"up","down"), rowname=ifelse(COLLAPSE, rowname, paste(geneName, rowname, sep="."))) %>% 
+    arrange(updown, log2FoldChange) %>% select(rowname, one_of('updown','circType','geneType')) %>% column_to_rownames()
   
   if(variable=="PDpathologygroup"){
     annotation_col = rownames_to_column(as.data.frame(colData(dds))) %>% arrange(!!as.name(variable), PD.pathology.group) %>% dplyr::select(rowname,variable, PD.pathology.group) %>% column_to_rownames()
   } else if(variable=="CONDITION2") {
     annotation_col = rownames_to_column(as.data.frame(colData(dds))) %>% arrange(!!as.name(variable), CONDITION) %>% dplyr::select(rowname,variable, CONDITION) %>% column_to_rownames()
   } else
-  annotation_col = rownames_to_column(as.data.frame(colData(dds))) %>% arrange(!!as.name(variable)) %>% dplyr::select(rowname,variable) %>% column_to_rownames()
+    annotation_col = rownames_to_column(as.data.frame(colData(dds))) %>% arrange(!!as.name(variable)) %>% dplyr::select(rowname,variable) %>% column_to_rownames()
   
   # reorder topDE
   topDE=topDE[rownames(annotation_row), rownames(annotation_col)]
   
   ann_colors = list(
     updown = c(up = "red", down = "blue"),
-    circType = c(circRNA = "red", ciRNA = "orange"),
-    geneType = c(protein_coding = "darkblue", lincRNA = "orange", Mt_rRNA='pink', 
-                 antisense='yellow', pseudogene='gray', processed_transcript='lightgray')
-  )
+    circType = c(circRNA = "red", ciRNA = "orange"))
+  
+  ## add color for geneType
+  genetypes = sort(table(as.character(DE10$geneType)), decreasing = T)
+  genetypes = setNames(colorRampPalette(brewer.pal(9, "Set1"))(length(genetypes)), names(genetypes))
+  ann_colors = c(geneType = list(genetypes), ann_colors)
+  
   tmp=c("green","red"); names(tmp)=c(variable_REF, variable_ALT);
   ann_colors=c(list(tmp), ann_colors); names(ann_colors)[1]=variable
   
@@ -710,17 +861,19 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
            cluster_cols = F,
            clustering_distance_cols = "correlation")
   
-  if(nrow(DE)>1){
+  DE0 = rbind(DE,DE2)
+  
+  if(nrow(DE0)>1){
     ## ==============================
-    message("# heatmap for all DE genes")
+    message(paste("# heatmap for all DE genes (p <=",format.pval(PVALUE_CUTOFF,3),")"))
     ## ==============================
-    #topDE=assay(vsd)[rownames(DE),rownames(colData(dds))]; 
-    topDE=vsd_adjusted_log2[rownames(DE),rownames(colData(dds))]; 
-    rownames(topDE) = paste(DE$geneName, rownames(topDE), sep=".")
+    topDE=assay(vsd)[rownames(DE0),rownames(colData(dds))]; 
+    #topDE=vsd_adjusted_log2[rownames(DE0),rownames(colData(dds))]; 
+    if(!COLLAPSE) rownames(topDE) = paste(DE0$geneName, rownames(topDE), sep=".") 
     
-    annotation_row = dplyr::select(DE, circType,geneType, log2FoldChange, baseMean, geneName) %>% rownames_to_column() %>% 
-      mutate(updown=ifelse(log2FoldChange>0,"up","down"), rowname=paste(geneName, rowname, sep=".")) %>% 
-      arrange(updown, -baseMean) %>% select(rowname, updown) %>% column_to_rownames()
+    annotation_row = dplyr::select(DE0, one_of(c('circType','geneType', 'pvalue', 'log2FoldChange', 'baseMean', 'geneName'))) %>% rownames_to_column() %>% 
+      rowwise() %>% mutate(updown=ifelse(log2FoldChange>0,"up","down"), rowname=ifelse(COLLAPSE, rowname, paste(geneName, rowname, sep=".")),updownP=ifelse(log2FoldChange>0,pvalue,-1*pvalue)) %>% 
+      arrange(updown, -updownP) %>% select(rowname, one_of('updown','circType','geneType')) %>% column_to_rownames()
     
     annotation_col = dplyr::select(as.data.frame(colData(dds)), variable) %>% rownames_to_column() %>% 
       arrange(!!as.name(variable)) %>% column_to_rownames()
@@ -730,10 +883,13 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
     
     ann_colors = list(
       updown = c(up = "red", down = "blue"),
-      circType = c(circRNA = "red", ciRNA = "orange"),
-      geneType = c(protein_coding = "darkblue", lincRNA = "orange", Mt_rRNA='pink', 
-                   antisense='yellow', pseudogene='gray', processed_transcript='lightgray')
-    )
+      circType = c(circRNA = "red", ciRNA = "orange"))
+    
+    ## add color for geneType
+    genetypes = sort(table(as.character(DE0$geneType)), decreasing = T)
+    genetypes = setNames(colorRampPalette(brewer.pal(9, "Set1"))(length(genetypes)), names(genetypes))
+    ann_colors = c(geneType = list(genetypes), ann_colors)
+    
     tmp=c("green","red"); names(tmp)=c(variable_REF, variable_ALT);
     ann_colors=c(list(tmp), ann_colors); names(ann_colors)[1]=variable
     
@@ -747,7 +903,7 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
     
     par(cex=0.5, mar=c(5, 8, 4, 1))
     pheatmap(topDE,
-             main =paste0(output_dir,": heatmap for all DE genes"),
+             main =paste0(output_dir,": heatmap for all DE genes (p <=", format.pval(PVALUE_CUTOFF,3), ")"),
              fontsize = 5,
              border_color = NA,
              color = colorRampPalette(c("lightblue","white","red"))(50),
@@ -766,34 +922,98 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
              clustering_distance_cols = "correlation")
   }
   
-  # violin plots between the groups
-  if(nrow(rbind(DE,DE2))>0){
-    individual <- counts(dds,normalized=TRUE)[rownames(rbind(DE,DE2)),]
+  ## for input list of genes
+  if(!is.null(file_of_gene_list) && file.exists(file_of_gene_list)){
+    ## ==============================
+    message("# heatmap for the input list of genes")
+    ## ==============================
+    geneList=read.table(file_of_gene_list, stringsAsFactors =F)$V1
+    
+    topDE=assay(vsd)[geneList,rownames(colData(dds))]; 
+    if(!COLLAPSE) rownames(topDE) = paste(RES[geneList,'geneName'], rownames(topDE), sep=".")
+    
+    annotation_row = dplyr::select(RES[geneList,], one_of(c('circType','geneType', 'pvalue', 'log2FoldChange', 'baseMean', 'geneName'))) %>% rownames_to_column() %>% 
+      rowwise() %>% mutate(updown=ifelse(log2FoldChange>0,"up","down"), rowname=ifelse(COLLAPSE, rowname, paste(geneName, rowname, sep=".")), updownP=ifelse(log2FoldChange>0,pvalue,-1*pvalue),) %>% 
+      arrange(updown, -updownP) %>% select(rowname, one_of('updown','circType','geneType')) %>% column_to_rownames()
+    
+    annotation_col = dplyr::select(as.data.frame(colData(dds)), variable) %>% rownames_to_column() %>% 
+      arrange(!!as.name(variable)) %>% column_to_rownames()
+    
+    # reorder topDE
+    topDE=topDE[rownames(annotation_row), rownames(annotation_col)]
+    
+    ann_colors = list(
+      updown = c(up = "red", down = "blue"),
+      circType = c(circRNA = "red", ciRNA = "orange"))
+    
+    ## add color for geneType
+    genetypes = sort(table(as.character(RES[geneList,'geneType'])), decreasing = T)
+    genetypes = setNames(colorRampPalette(brewer.pal(9, "Set1"))(length(genetypes)), names(genetypes))
+    ann_colors = c(geneType = list(genetypes), ann_colors)
+    
+    ## Scale/center each genes (by rows)
+    topDE=t(scale(t(as.matrix(topDE))))
+    
+    ## trim max and min
+    MAX=2; MIN=-2; topDE[topDE>MAX]=MAX;topDE[topDE<MIN]=MIN
+    
+    ## add noise to avoid SD=0 cases
+    #topDE=topDE + matrix(rnorm(prod(dim(topDE)),0,0.01),nrow = nrow(topDE),ncol = ncol(topDE))
+    
+    par(cex=0.5, mar=c(5, 8, 4, 1))
+    pheatmap(topDE,
+             main =paste0(output_dir,": heatmap for the input list of genes"),
+             fontsize = 5,
+             border_color = NA,
+             color = colorRampPalette(c("lightblue", "white", "red"))(50),
+             annotation_row = annotation_row,
+             annotation_col = annotation_col,
+             annotation_colors = ann_colors,
+             drop_levels = TRUE,
+             scale = "none", 
+             clustering_method = 'ward.D', 
+             cluster_rows = F,
+             clustering_distance_rows = "correlation",
+             gaps_row = as.vector(table(annotation_row$updown))[1],
+             #cutree_rows = 2,
+             #cutree_cols=2,
+             cluster_cols = F,
+             clustering_distance_cols = "correlation")
+  }
+  message("# violin plots between the groups")
+  
+  if(nrow(DE0)>0){
+    individual <- counts(dds,normalized=TRUE)[rownames(DE0),]
     colnames(individual) = dds[[variable]]
     
     df = rownames_to_column(as.data.frame(individual)) %>% gather(key=variable, value = "norm_expressed", -1) %>% 
-      mutate(!!variable := gsub("(.*)\\..*","\\1",variable)) # %>% # filter(rowname=='chr13_78293666_78320990')
+      mutate(!!variable := gsub("(.*)\\..*","\\1",variable))
     
-    library(ggforce)# install.packages('ggforce')
-    p = ggplot(df, aes_string(x=variable, y="norm_expressed")) + 
-      geom_violin(trim=FALSE, fill="gray")+
-      geom_boxplot(width=0.1)+
-      scale_y_log10() + 
-      facet_wrap_paginate(~rowname, nrow = 4, ncol = 4, page = NULL, scales='free') + 
-      labs(title="Plot of expression by case and control",x="Groups", y = "Normalized expression")+
-      theme_classic() 
-    class(p) <- c('gg_multiple', class(p))
+    # remove NA
+    df=df[!is.na(df[[variable]]),]
+    df=df[!is.na(df$norm_expressed),]
+    df=df[!is.na(df$rowname),]
     
-    print(p)
+    for(i in 1:ceiling(length(unique(df$rowname))/16)){
+      p = ggplot(df, aes_string(x=variable, y="norm_expressed")) + 
+        geom_violin(trim=FALSE, fill="gray")+
+        geom_boxplot(width=0.1)+
+        scale_y_log10() + 
+        facet_wrap_paginate(~rowname, nrow = 4, ncol = 4, page = i, scales='free') + 
+        labs(title="Plot of expression by case and control",x="Groups", y = "Normalized expression")+
+        theme_classic() 
+      class(p) <- c('gg_multiple', class(p))
+      print(p)
+    }
   }
-
+  
   dev.off() 
   
   message("## Exporting results to HTML")
   
   htmlRep <- HTMLReport(shortName=com_name, title=com_name,
                         reportDirectory="report")
-  publish(makeNewImages(rownames_to_column(RES, var="circID") %>% dplyr::select(starts_with("circ"), starts_with("baseMean"), log2FoldChange, pvalue, padj, geneName, geneType, geneDescription)), htmlRep)
+  publish(makeNewImages(rownames_to_column(DE0, var="ID") %>% dplyr::select(ID, starts_with("circ"), starts_with("baseMean"), log2FoldChange, pvalue, padj, geneName, geneType, geneDescription)), htmlRep)
   finish(htmlRep)
   
 } else stop("Unrecognized comparison format. Please use style like --comparison=DX:PD:HC", call. = F);

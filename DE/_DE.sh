@@ -52,22 +52,40 @@ Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filt
 Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.AD.TCPY.pathology.covariates.xls -o DE_TCPY -O i -C Braak_Braak_stage
 Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O i -C MUSS
 
-Rscript ~/projects/circRNA/src/DE/_DE2gene.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE2gene_SNDA -O Mmi -C CONDITION2:PD:HC
-Rscript ~/projects/circRNA/src/DE/_DE2gene.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.AD.TCPY.pathology.covariates.xls -o DE2gene_TCPY -O Mmi -C CONDITION:AD:HC
-Rscript ~/projects/circRNA/src/DE/_DE2gene.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.AD.TCPY.pathology.covariates.xls -o DE2gene_TCPY -O i -C Braak_Braak_stage
-Rscript ~/projects/circRNA/src/DE/_DE2gene.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE2gene_SNDA -O i -C MUSS
+Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE2gene_SNDA -O Mmi -C CONDITION:PD:HC -k
+Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE2gene_SNDA -O Mmi -C CONDITION:ILB:HC -k
 
-# CSP
+Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE2gene_SNDA -O Mmi -C CONDITION2:PD:HC -k
+Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.AD.TCPY.pathology.covariates.xls -o DE2gene_TCPY -O Mmi -C CONDITION:AD:HC -k 
+Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.AD.TCPY.pathology.covariates.xls -o DE2gene_TCPY -O i -C Braak_Braak_stage -k
+Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE2gene_SNDA -O i -C MUSS -k
+
+# for i in DEresult.DE2gene_SNDA.*xls; do awk '$6<=0.05' $i | cut -f1-6; done | cut -f1 | sort -u > DEgenes.list
+Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE2gene_SNDA -O Mmi -C CONDITION2:PD:HC -k -l DEgenes.list
+
+# CSF
 Rscript ~/projects/circRNA/src/DE/_DE2gene.R -i ../data/Merge_circexplorer_CSF87.rawcount.rds -c Table.PD.CSF.pathology.covariates.xls -o DE2gene_CSF -O Mmi -C CONDITION2:PD:HC -a ~/projects/circRNA/data/Merge_circexplorer_CSF87.annotation.bed14.rds
 
 
 ## pathway analysis
-cd ~/projects/circRNA/results/DE_SNDA; Rscript ~/projects/circRNA/src/DE/_pathway.R -i DEresult.DE_SNDA.CONDITION2_PD_vs_HC.xls -F no 
-cd ~/projects/circRNA/results/DE_TCPY; Rscript ~/projects/circRNA/src/DE/_pathway.R -i DEresult.DE_TCPY.CONDITION_AD_vs_HC.xls -F no 
+cd ~/projects/circRNA/results/DE2gene_SNDA; Rscript ~/projects/circRNA/src/DE/_pathway.R -i DEresult.DE2gene_SNDA.CONDITION2_PD_vs_HC.xls -F loose
+cd ~/projects/circRNA/results/DE2gene_TCPY; Rscript ~/projects/circRNA/src/DE/_pathway.R -i DEresult.DE2gene_TCPY.CONDITION_AD_vs_HC.xls -F loose
 
 ## WGCNA analysis
 cd ~/projects/circRNA/results/DE_SNDA; Rscript ~/projects/circRNA/src/DE/_WGCNA.R -i ~/projects/circRNA/data/Merge_circexplorer_BC197.filtered.enriched.normRPM.rds -c 
 
 ## AD vs. PD DE comparison
+# see comparison.R
+
+##======================
+## gene
+##======================
+cd ~/neurogen/rnaseq_PD/results/; Rscript ~/projects/circRNA/src/DE/_DE.R -i merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA.gene -O Mmi -C CONDITION2:PD:HC -t gene
+cd ~/neurogen/rnaseq_PD/results/; Rscript ~/projects/circRNA/src/DE/_DE.R -i merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls -c Table.AD.TCPY.pathology.covariates.xls -o DE_TCPY.gene -O Mmi -C CONDITION:AD:HC -t gene
+cd ~/neurogen/rnaseq_PD/results/; Rscript ~/projects/circRNA/src/DE/_DE.R -i merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls -c Table.AD.TCPY.pathology.covariates.xls -o DE_TCPY.gene -O Mmi -C CONDITION:AD:HC -t gene
+cd ~/neurogen/rnaseq_CSF/results; Rscript ~/projects/circRNA/src/DE/_DE.R -i merged/genes.htseqcount.cufflinks.CSF.uniq.xls -c Table.PD.CSF.pathology.covariates.xls -o DE_CSF.gene -O Mmi -C CONDITION:PD:HC -t gene
 
 
+## pathway analysis
+cd ~/neurogen/rnaseq_PD/results/DE_SNDA.gene; Rscript ~/projects/circRNA/src/DE/_pathway.R -i DEresult.DE_SNDA.gene.CONDITION2_PD_vs_HC.xls -F medium
+cd ~/neurogen/rnaseq_PD/results/DE_TCPY.gene; Rscript ~/projects/circRNA/src/DE/_pathway.R -i DEresult.DE_TCPY.gene.CONDITION_AD_vs_HC.xls -F medium
