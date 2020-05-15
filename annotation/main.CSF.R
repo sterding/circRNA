@@ -59,8 +59,33 @@ axis(1, at=1:9,labels=1:9)
 dev.off()
 ## only few circRNAs expressed in 90% samples in our case. So, it's applicable to divide into 'high' vs. 'low' like the paper above. 
 
+###########################################
+# How many are they also detected in PD SNDA?
+###########################################
+Merge_circexp_raw = readRDS("Merge_circexplorer_CSF87.rawcount.rds")
+dim(Merge_circexp_raw); head(Merge_circexp_raw)
+Merge_circexp_raw_PD=select(Merge_circexp_raw, starts_with("PD")); dim(Merge_circexp_raw_PD)
+Merge_circexp_raw_filtered_PD=Merge_circexp_raw_PD[rowSums(Merge_circexp_raw_PD)>=2,]; 
+dim(Merge_circexp_raw_filtered_PD)
+SNDA=readRDS("Merge_circexplorer_BC197.filtered.rawcount.rds")
+########## TODO
+head(SNDA); dim(SNDA);
+Merge_circexp_raw_SNDA=select(SNDA, contains("PD")); head(Merge_circexp_raw_SNDA)
+Merge_circexp_raw_filtered_SNDA=Merge_circexp_raw_SNDA[rowSums(Merge_circexp_raw_SNDA)>0,]
+dim(Merge_circexp_raw_filtered_SNDA)
+sum(rownames(Merge_circexp_raw_filtered_PD) %in% rownames(Merge_circexp_raw_filtered_SNDA))
 
+# collapsed to gene level
+table((filter(readRDS("Merge_circexplorer_CSF87.annotation.bed14.rds"),ID %in% rownames(Merge_circexp_raw_filtered_PD)) %>%
+  pull(geneName) %>% unique()) %in% 
+  (filter(readRDS("Merge_circexplorer_BC197.annotation.bed14.rds"),ID %in% rownames(Merge_circexp_raw_filtered_SNDA)) %>%
+                                       pull(geneName) %>% unique()))
 
+# More ciRNAs detected in CSF than in neuron
+table(filter(readRDS("Merge_circexplorer_CSF87.annotation.bed14.rds"),ID %in% rownames(Merge_circexp_raw_filtered_PD)) %>% pull(circType))
+# circRNA   ciRNA 
+# 24    3827 
+table(filter(readRDS("Merge_circexplorer_BC197.annotation.bed14.rds"),ID %in% rownames(Merge_circexp_raw_filtered_SNDA)) %>% pull(circType))
 ###########################################
 ############ filter cirRNAs     ###########
 ###########################################
@@ -75,6 +100,7 @@ dim(Merge_circexp_raw_filtered); dim(Merge_circexp_norm_filtered); dim(annotatio
 saveRDS(Merge_circexp_raw_filtered, file="Merge_circexplorer_CSF87.filtered.rawcount.rds")
 saveRDS(Merge_circexp_norm_filtered, file="Merge_circexplorer_CSF87.filtered.normRPM.rds")
 saveRDS(annotation_filtered, file="Merge_circexplorer_CSF87.filtered.annotation.bed14.rds")
+
 
 ## enriched
 
@@ -119,7 +145,7 @@ dim(Merge_circexp_raw_pilot)
 # [1] 2496  10
 head(sort(rowSums(Merge_circexp_raw_pilot),decreasing = T),20)
 # How many are they also detected in SNDA?
-sum(rownames(Merge_circexp_raw_pilot) %in% (readRDS("../data/Merge_circexplorer_BC197.annotation.bed14.rds")$ID))
+sum(rownames(Merge_circexp_raw_pilot) %in% (readRDS("Merge_circexplorer_BC197.annotation.bed14.rds")$ID))
 # [1] 275
 rowSums(Merge_circexp_raw_pilot['chrX_139865339_139866824',])
 # chrX_139865339_139866824 

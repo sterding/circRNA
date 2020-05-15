@@ -38,6 +38,8 @@ invnorm <- function(indpval, nrep, BHth = 0.05) {
 }
 library(dplyr)
 setwd("~/projects/circRNA/results/")
+
+
 res_TCPY_AD = read.table("DE2gene_TCPY/DEresult.DE2gene_TCPY.CONDITION_AD_vs_HC.xls", header = T, stringsAsFactors = F, sep = "\t", row.names = 1)
 head(res_TCPY_AD); dim(res_TCPY_AD)
 
@@ -71,10 +73,87 @@ for(i in 1:4)
            log2FC_TCPY = round(log2FC_TCPY,2), log2FC_MSBB=round(log2FC_MSBB, 2)) %>%
     column_to_rownames() %>% select(Chr, pvalue_TCPY, log2FC_TCPY, pvalue_MSBB, log2FC_MSBB, pvalue_meta, padj_meta, geneDescription) %>%
     write.table(paste0("DE2gene_TCPY/summaryTable.",names(Ns)[i],".meta.padj0.05.xls"), sep="\t", quote =F, na="", row.names=T, col.names = NA)
+  
+  # barplot
+  df=read.table(paste0("DE2gene_TCPY/summaryTable.",names(Ns)[i],".meta.padj0.05.xls"), sep="\t", header = T, stringsAsFactors = F, row.names = 1)
+  df = subset(df, pvalue_TCPY<=0.05 & pvalue_MSBB<=0.05, select=c("pvalue_meta","pvalue_MSBB","pvalue_TCPY")); dim(df)
+  pdf(paste0("DE2gene_TCPY/summaryTable.",names(Ns)[i],".meta.padj0.05.pdf"), width=5, height=3)
+  par(mar=c(4,7,2,3));
+  barplot(as.matrix(t(-log10(df))), beside=T, horiz=TRUE, las=1, xlab=expression('-log'[10]*"(pvalue)"), main=paste0("DE2gene_TCPY/summaryTable.",names(Ns)[i],".meta.padj0.05")); 
+  abline(v=c(-log10(0.05)))
+  dev.off()
 }
 # BM10 19
 # BM22 21
 # BM36 30
 # BM44 46
+
+
+## meta between BC dopamine samples vs. Bennett midbrain samples
+setwd("~/projects/circRNA/results/")
+
+res1 = read.table("DE2gene_VMB/DEresult.DE2gene_VMB.CONDITION_PD_vs_HC.xls.gz", header = T, stringsAsFactors = F, sep = "\t", row.names = 1)
+head(res1); dim(res1)
+
+res2 = read.table("DE2gene_SNDA/DEresult.DE2gene_SNDA.CONDITION2_PD_vs_HC.xls", header = T, stringsAsFactors = F, sep = "\t", row.names = 1)
+head(res2); dim(res2)
+
+# trim
+res1_trim = res1[intersect(rownames(res1),rownames(res2)),]
+res2_trim = res2[intersect(rownames(res1),rownames(res2)),]
+dim(res1); dim(res2); dim(res1_trim); dim(res2_trim)
+rawpval = list("pval1"=res1_trim[["pvalue"]],"pval2"=res2_trim[["pvalue"]])
+
+invnormcomb = invnorm(rawpval,nrep=c(23,104), BHth = 0.05)
+invnormcomb$DEindices <- NULL
+invnormcomb = as.data.frame(invnormcomb)
+rownames(invnormcomb) <- rownames(res2_trim)
+#head(invnormcomb_AD)
+message(paste(sum(invnormcomb$adjpval<0.05)))
+options(scipen=2)
+options(digits=3)
+select(res1_trim, geneDescription, pvalue_1=pvalue, log2FC_1 = log2FoldChange) %>% 
+  rownames_to_column() %>%
+  bind_cols(select(res2_trim,pvalue_2=pvalue,log2FC_2=log2FoldChange), select(invnormcomb, pvalue_meta=rawpval, padj_meta = adjpval)) %>% 
+  filter(pvalue_meta <=0.05) %>% arrange(pvalue_meta) %>%
+  column_to_rownames() %>% select(pvalue_VMB = pvalue_1, log2FC_VMB = log2FC_1, pvalue_SNDA=pvalue_2, log2FC_SNDA=log2FC_2, pvalue_meta, padj_meta, geneDescription) %>%
+  write.table(paste0("DE2gene_SNDA/summaryTable.VMB.meta.p0.05.xls"), sep="\t", quote =F, na="", row.names=T, col.names = NA)
+
+# barplot
+df=read.table(paste0("DE2gene_SNDA/summaryTable.VMB.meta.p0.05.xls"), sep="\t", header = T, stringsAsFactors = F, row.names = 1)
+head(df)
+df = subset(df, pvalue_SNDA<=0.05 & pvalue_VMB<=0.1, select=c("pvalue_meta","pvalue_VMB","pvalue_SNDA")) 
+pdf("DE2gene_SNDA/summaryTable.VMB.meta.p0.05.pdf", width=5, height=3)
+par(mar=c(4,7,2,3));barplot(as.matrix(t(-log10(df))), beside=T, horiz=TRUE, las=1, xlab=expression('-log'[10]*"(pvalue)")); abline(v=c(-log10(0.05)))
+dev.off()
+
+## AD
+res1 = read.table("DE2gene_FCX/DEresult.DE2gene_FCX.CONDITION_AD_vs_HC.xls.gz", header = T, stringsAsFactors = F, sep = "\t", row.names = 1)
+head(res1); dim(res1)
+
+res2 = read.table("DE2gene_TCPY/DEresult.DE2gene_TCPY.CONDITION_AD_vs_HC.xls", header = T, stringsAsFactors = F, sep = "\t", row.names = 1)
+head(res2); dim(res2)
+
+# trim
+res1_trim = res1[intersect(rownames(res1),rownames(res2)),]
+res2_trim = res2[intersect(rownames(res1),rownames(res2)),]
+dim(res1); dim(res2); dim(res1_trim); dim(res2_trim)
+rawpval = list("pval1"=res1_trim[["pvalue"]],"pval2"=res2_trim[["pvalue"]])
+
+invnormcomb = invnorm(rawpval,nrep=c(19,83), BHth = 0.05)
+invnormcomb$DEindices <- NULL
+invnormcomb = as.data.frame(invnormcomb)
+rownames(invnormcomb) <- rownames(res2_trim)
+#head(invnormcomb_AD)
+message(paste(sum(invnormcomb$adjpval<0.05)))
+options(scipen=2)
+options(digits=3)
+select(res1_trim, geneDescription, pvalue_1=pvalue, log2FC_1 = log2FoldChange) %>% 
+  rownames_to_column() %>%
+  bind_cols(select(res2_trim,pvalue_2=pvalue,log2FC_2=log2FoldChange), select(invnormcomb, pvalue_meta=rawpval, padj_meta = adjpval)) %>% 
+  filter(pvalue_meta <=0.05) %>% arrange(pvalue_meta) %>%
+  column_to_rownames() %>% select(pvalue_FCX = pvalue_1, log2FC_FCX = log2FC_1, pvalue_TCPY=pvalue_2, log2FC_TCPY=log2FC_2, pvalue_meta, padj_meta, geneDescription) %>%
+  write.table(paste0("DE2gene_TCPY/summaryTable.FCX.meta.p0.05.xls"), sep="\t", quote =F, na="", row.names=T, col.names = NA)
+
 
 

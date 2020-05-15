@@ -171,8 +171,8 @@ dev.off()
 ### =======================
 ## DE2gene_SNDA: PD vs. MUSS
 ### =======================
-df1=read.table("DE2gene_SNDA/DEresult.DE2gene_SNDA.CONDITION2_PD_vs_HC.xls", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
-df2=read.table("DE2gene_SNDA/DEresult.DE2gene_SNDA.MUSS.xls", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df1=read.table("DE2gene_SNDA/DEresult.DE2gene_SNDA.CONDITION_PD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df2=read.table("DE2gene_SNDA/DEresult.DE2gene_SNDA.MUSS.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
 df1df2 = inner_join(rownames_to_column(df1) %>% filter(pvalue<=1) %>% select(1:8), 
                     rownames_to_column(df2) %>% filter(pvalue<=1) %>% select(1:13), 
                     by = 'rowname') # %>% mutate(log2FoldChange.y=-1*log2FoldChange.y) # sign of fold change for continous variable?
@@ -266,6 +266,112 @@ df = filter(df1df2, pvalue.x<=0.05 | pvalue.y<=0.05) %>% mutate(log2FoldChangeX 
   select(genename, SNDA=log2FoldChange.x, CSF=log2FoldChange.y) 
 df$genename= factor(df$genename, levels = as.character(df$genename))
 p= ggplot(gather(df, key="comparison", value="log2FoldChange", 2:3), aes(x=genename, y=log2FoldChange, fill=comparison)) +
+  geom_bar(stat="identity", position=position_dodge()) + coord_flip()  + 
+  # geom_text(aes(label=paste0(observed," (",round(OR,1),")")), position = position_dodge(width=1), hjust=0, vjust=.5, angle = 90, size=2.5) +  # TODO: add significance *
+  theme_minimal() + theme(legend.justification=c(1,0), legend.position=c(1,0))
+print(p)
+
+dev.off()
+
+### =======================
+## DE2gene_SNDA circRNA vs. mRNAs
+### =======================
+df1=read.table("~/projects/circRNA/results/DE2gene_SNDA/DEresult.DE2gene_SNDA.CONDITION2_PD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df2=read.table("~/neurogen/rnaseq_PD/results/DE_SNDA.gene/DEresult.DE_SNDA.gene.CONDITION2_PD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+head(df1); head(df2)
+df1df2 = inner_join(rownames_to_column(df1) %>% filter(pvalue<=1) %>% select(1:10) %>% mutate(geneID=gsub("\\..*","",geneID)), 
+                    df2 %>% filter(pvalue<=1) %>% select(1:16), 
+                    by = 'geneID') # %>% mutate(log2FoldChange.y=-1*log2FoldChange.y) # sign of fold change for continous variable?
+head(df1df2)
+
+pdf(file = "PD.SNDA.circRNAmRNA.DE2gene.barplot.pdf", paper = 'US')
+
+# Intersection of genes qualified for DE analysis
+gplots::venn(list(circRNA = df1$geneName, gene = df2$geneName))
+
+# correlation between their foldchange
+cortest = cor.test(df1df2$log2FoldChange.x, df1df2$log2FoldChange.y,alternative = "two.sided", method = "pearson")
+plot(df1df2$log2FoldChange.x, df1df2$log2FoldChange.y, 
+     xlab="log2FoldChange (PD vs. HC for circRNAs)", ylab="log2FoldChange (PD vs. HC for host gene)", 
+     main="Correlation coeffecient analysis (PD-associated circRNAs vs. host genes)")
+mtext(paste("Pearson's r =", round(cortest$estimate, 2), "(p-value:", format.pval(cortest$p.value),")"))
+
+# correlation between their expression level
+cortest = cor.test(df1df2$baseMean.x, df1df2$baseMean.y,alternative = "two.sided", method = "spearman")
+plot(log10(0.1+df1df2$baseMean.x), log10(df1df2$baseMean.y+0.1), 
+     xlab="baseMean (PD vs. HC for circRNAs)", ylab="baseMean (PD vs. HC for host gene)", 
+     main="Correlation coeffecient analysis (PD-associated circRNAs vs. host genes)")
+mtext(paste("Pearson's r =", round(cortest$estimate, 2), "(p-value:", format.pval(cortest$p.value),")"))
+
+# significant in either comparison
+filter(df1df2, pvalue.x<=0.05 | pvalue.y<=0.05) %>% with(table(log2FoldChange.x>0, log2FoldChange.y>0))
+# save to excel
+filter(df1df2, pvalue.x<=0.05 | pvalue.y<=0.05) %>% mutate(Chr=chr) %>% 
+  select(CircRNA=rowname, Chr, log2FoldChange.circRNA = log2FoldChange.x, pvalue.circRNA = pvalue.x, log2FoldChange.hostgene = log2FoldChange.y, pvalue.hostgene = pvalue.y) %>%
+  write.table(file="PD.SNDA.circRNAmRNA.DE2gene.xls", sep="\t", na="", row.names=F)
+
+# DE genes in both comparisons
+gplots::venn(list(circRNA = subset(df1, pvalue<=0.05, geneName, drop = T), gene = subset(df2, pvalue<=0.05, geneName, drop = T)))
+
+# barplot
+df = filter(df1df2, pvalue.x<=0.05 | pvalue.y<=0.05) %>% mutate(log2FoldChangeX = log2FoldChange.x>0, log2FoldChangeY = log2FoldChange.y>0) %>%
+  arrange(log2FoldChangeX, log2FoldChangeY, log2FoldChange.x) %>% 
+  select(geneName, circRNA=log2FoldChange.x, genes=log2FoldChange.y) 
+df$geneName= factor(df$geneName, levels = as.character(df$geneName))
+p= ggplot(gather(df, key="comparison", value="log2FoldChange", 2:3), aes(x=geneName, y=log2FoldChange, fill=comparison)) +
+  geom_bar(stat="identity", position=position_dodge()) + coord_flip()  + 
+  # geom_text(aes(label=paste0(observed," (",round(OR,1),")")), position = position_dodge(width=1), hjust=0, vjust=.5, angle = 90, size=2.5) +  # TODO: add significance *
+  theme_minimal() + theme(legend.justification=c(1,0), legend.position=c(1,0))
+print(p)
+
+dev.off()
+
+### =======================
+## DE2gene_TCPY circRNA vs. mRNAs
+### =======================
+df1=read.table("~/projects/circRNA/results/DE2gene_TCPY/DEresult.DE2gene_TCPY.CONDITION_AD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df2=read.table("~/neurogen/rnaseq_PD/results/DE_TCPY.gene/DEresult.DE_TCPY.gene.CONDITION_AD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+head(df1); head(df2)
+df1df2 = inner_join(rownames_to_column(df1) %>% filter(pvalue<=1) %>% select(1:10) %>% mutate(geneID=gsub("\\..*","",geneID)), 
+                    df2 %>% filter(pvalue<=1) %>% select(1:16), 
+                    by = 'geneID') # %>% mutate(log2FoldChange.y=-1*log2FoldChange.y) # sign of fold change for continous variable?
+head(df1df2)
+
+pdf(file = "AD.TCPY.circRNAmRNA.DE2gene.barplot.pdf", paper = 'US')
+
+# Intersection of genes qualified for DE analysis
+gplots::venn(list(circRNA = df1$geneName, gene = df2$geneName))
+
+# correlation between their foldchange
+cortest = cor.test(df1df2$log2FoldChange.x, df1df2$log2FoldChange.y,alternative = "two.sided", method = "pearson")
+plot(df1df2$log2FoldChange.x, df1df2$log2FoldChange.y, 
+     xlab="log2FoldChange (AD vs. HC for circRNAs)", ylab="log2FoldChange (AD vs. HC for host gene)", 
+     main="Correlation coeffecient analysis (AD-associated circRNAs vs. host genes)")
+mtext(paste("Pearson's r =", round(cortest$estimate, 2), "(p-value:", format.pval(cortest$p.value),")"))
+
+# correlation between their expression level
+cortest = cor.test(df1df2$baseMean.x, df1df2$baseMean.y,alternative = "two.sided", method = "spearman")
+plot(log10(0.1+df1df2$baseMean.x), log10(df1df2$baseMean.y+0.1), 
+     xlab="baseMean (AD vs. HC for circRNAs)", ylab="baseMean (AD vs. HC for host gene)", 
+     main="Correlation coeffecient analysis (AD-associated circRNAs vs. host genes)")
+mtext(paste("Pearson's r =", round(cortest$estimate, 2), "(p-value:", format.pval(cortest$p.value),")"))
+
+# significant in either comparison
+filter(df1df2, pvalue.x<=0.05 | pvalue.y<=0.05) %>% with(table(log2FoldChange.x>0, log2FoldChange.y>0))
+# save to excel
+filter(df1df2, pvalue.x<=0.05 | pvalue.y<=0.05) %>% mutate(Chr=chr) %>% 
+  select(CircRNA=rowname, Chr, log2FoldChange.circRNA = log2FoldChange.x, pvalue.circRNA = pvalue.x, log2FoldChange.hostgene = log2FoldChange.y, pvalue.hostgene = pvalue.y) %>%
+  write.table(file="AD.TCPY.circRNAmRNA.DE2gene.xls", sep="\t", na="", row.names=F)
+
+# DE genes in both comparisons
+gplots::venn(list(circRNA = subset(df1, pvalue<=0.05, geneName, drop = T), gene = subset(df2, pvalue<=0.05, geneName, drop = T)))
+
+# barplot
+df = filter(df1df2, pvalue.x<=0.05 | pvalue.y<=0.05) %>% mutate(log2FoldChangeX = log2FoldChange.x>0, log2FoldChangeY = log2FoldChange.y>0) %>%
+  arrange(log2FoldChangeX, log2FoldChangeY, log2FoldChange.x) %>% 
+  select(geneName, circRNA=log2FoldChange.x, genes=log2FoldChange.y) 
+df$geneName= factor(df$geneName, levels = as.character(df$geneName))
+p= ggplot(gather(df, key="comparison", value="log2FoldChange", 2:3), aes(x=geneName, y=log2FoldChange, fill=comparison)) +
   geom_bar(stat="identity", position=position_dodge()) + coord_flip()  + 
   # geom_text(aes(label=paste0(observed," (",round(OR,1),")")), position = position_dodge(width=1), hjust=0, vjust=.5, angle = 90, size=2.5) +  # TODO: add significance *
   theme_minimal() + theme(legend.justification=c(1,0), legend.position=c(1,0))

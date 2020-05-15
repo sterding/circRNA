@@ -26,6 +26,8 @@ option_list = list(
               help="Comparison in format of Variable:X:Y", metavar="character"),
   make_option(c("-k", "--collapse"), action="store_true", default=FALSE,  
               help="Collapse circRNAs to gene level"),
+  make_option(c("-s", "--scMode"), action="store_true", default=FALSE,  
+              help="Single-cell like data (using zero-inflated NB model)"),
   make_option(c("-D", "--downsize"), action="store_false", default=T,  
               help="Downsize the insignificant genes"),
   make_option(c("-g", "--genome"), type="character", default='hg19', 
@@ -48,6 +50,7 @@ index=opt$genome
 annotation_path=opt$annotation
 comparison=opt$comparison
 COLLAPSE=opt$collapse
+scMode=opt$scMode
 DOWNSIZE=opt$downsize
 file_of_gene_list = opt$gene_list
 gene_type = opt$gene_type
@@ -60,8 +63,9 @@ gene_type = opt$gene_type
 # setwd("~/projects/circRNA/results/"); input_expression_filename="../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls"; output_additonal_columns='Mi'; output_dir="DE_SNDA"; index="hg19"; comparison="CONDITION2:PD:HC"; annotation_path='~/projects/circRNA/data/Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.rds'
 # setwd("~/projects/circRNA/results/"); input_expression_filename="../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds"; input_covariance_filename="Table.AD.TCPY.pathology.covariates.xls"; output_additonal_columns='Mi'; output_dir="DE_TCPY"; index="hg19"; comparison="CONDITION:AD:HC"; annotation_path='~/projects/circRNA/data/Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.rds'
 # setwd("~/projects/circRNA/results/"); input_expression_filename="../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls"; output_additonal_columns='Mmi'; output_dir="DE2gene_SNDA"; index="hg19"; comparison="CONDITION2:PD:HC"; annotation_path='~/projects/circRNA/data/Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.rds'; COLLAPSE=TRUE
-# setwd("~/neurogen/rnaseq_PD/results/"); input_expression_filename="merged/genes.count.cuffnorm.allSamples.BCv2.uniq.xls"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls"; output_additonal_columns='Mmi'; output_dir="DE_SNDA.gene"; index="hg19"; comparison="CONDITION2:PD:HC"; gene_type='gene'
+# setwd("~/projects/circRNA/results/"); input_expression_filename="../data/Merge_circexplorer_Bennett_VMB.filtered.rawcount.rds"; input_covariance_filename="Table.Bennett.PD.VMP.pathology.covariates.xls"; output_additonal_columns='Mmi'; output_dir="DE2gene_VMB"; index="hg19"; comparison="CONDITION:PD:HC"; annotation_path='~/projects/circRNA/data/Merge_circexplorer_Bennett_VMB.filtered.annotation.bed14.rds'; COLLAPSE=TRUE; gene_type='circRNA'
 
+# setwd("~/neurogen/rnaseq_PD/results/"); input_expression_filename="merged/genes.count.cuffnorm.allSamples.BCv2.uniq.xls"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls"; output_additonal_columns='Mmi'; output_dir="DE_SNDA.gene"; index="hg19"; comparison="CONDITION2:PD:HC"; gene_type='gene'
 
 if(is.null(comparison)){
   print_help(opt_parser)
@@ -85,6 +89,7 @@ if(!file.exists(input_covariance_filename)) {stop(paste(input_covariance_filenam
 
 # Create folder if the directory doesn't exist
 dir.create(file.path(output_dir,'report/figures'), recursive =T, showWarnings = FALSE)
+dir.create(file.path(output_dir,'report/data'), recursive =T, showWarnings = FALSE)
 
 pwd=getwd()
 setwd(output_dir)
@@ -128,7 +133,7 @@ if(file.exists(file.path("DESeq2.RData"))) load(file.path("DESeq2.RData")) else 
     genes_annotation = select(circRNA_annotation, ID, circType, geneID, geneName, geneType, geneDescription)
   }
   if(gene_type=='gene') genes_annotation=mutate(genes_annotation, ID=geneID) %>% select(ID, everything())
-
+  
   # raw reads count
   if(tolower(tools::file_ext(input_expression_filename)) == "rds") {
     cts=readRDS(file.path(pwd,input_expression_filename))
@@ -214,7 +219,13 @@ if(file.exists(file.path("DESeq2.RData"))) load(file.path("DESeq2.RData")) else 
   vsd <- varianceStabilizingTransformation(dds, blind=T) # Note: blind to the design, equal to design = ~ 1
   
   # # using limma to remove covariates, it returns adjusted values in log2 scale
-  vsd_adjusted_log2 <- removeBatchEffect(assay(vsd), batch=vsd$BATCH, batch2=vsd$SEX, covariates = colData(vsd)[,colnames(colData(vsd)) %in% c('AGE','PMI','RIN')])
+  if("BATCH" %in% colnames(covarianceTable)) {
+    if("SEX" %in% colnames(covarianceTable)) vsd_adjusted_log2 <- removeBatchEffect(assay(vsd), batch=vsd$BATCH, batch2=vsd$SEX, covariates = colData(vsd)[,colnames(colData(vsd)) %in% c('AGE','PMI','RIN')]) else
+      vsd_adjusted_log2 <- removeBatchEffect(assay(vsd), batch=vsd$BATCH, batch2=NULL, covariates = colData(vsd)[,colnames(colData(vsd)) %in% c('AGE','PMI','RIN')])
+  } else {
+    if("SEX" %in% colnames(covarianceTable)) vsd_adjusted_log2 <- removeBatchEffect(assay(vsd), batch=NULL, batch2=vsd$SEX, covariates = colData(vsd)[,colnames(colData(vsd)) %in% c('AGE','PMI','RIN')]) else
+      vsd_adjusted_log2 <- removeBatchEffect(assay(vsd), batch=NULL, batch2=NULL, covariates = colData(vsd)[,colnames(colData(vsd)) %in% c('AGE','PMI','RIN')])
+  }
   
   pdf("diagnosis.pdf")
   par(mar=c(10,5,3,3));boxplot(assay(ntd), las=2, cex.axis=.7, ylab="log2(x+1) transform")
@@ -284,27 +295,56 @@ makeNewImages <- function(df,...){
     if(variable=="MUSS") d=d[d$MUSS %in% c(0:4),]
     d=d[!(is.na(d[[variable]]) | d[[variable]]=="NA"),]
     
-    if(!file.exists(file.path('report/figures',tablename[i]))) {
-      write.table(d,file.path('report/figures',tablename[i]),sep="\t", quote =F, row.names=F, col.names = T)
+    if(!file.exists(file.path('report/data',tablename[i]))) {
+      write.table(d,file.path('report/data',tablename[i]),sep="\t", quote =F, row.names=F, col.names = T)
     }
     if(!file.exists(file.path('report/figures',imagename[i]))) 
     {
       N=length(levels(colData(dds)[[variable]]))  # here has to be dds, as variable will be set to factor in dds (not in DDS or vsd) if it's a factor
-      if(N>0){  # non factor
-        p=ggplot(d, aes_string(x=variable, y="expression_log2vsd")) + 
-          geom_boxplot(position=position_dodge(.8), width=.5, outlier.shape = NA) +
-          geom_jitter(size=1.5, position = position_jitter(width=.15)) +
-          theme_bw() +
-          xlab(variable) + ylab("log2(normalized adjusted expression)") + ggtitle(ensId, subtitle = geneDescription)
-      }else{
-        N=3; # random number to make a nearly square figure
-        p=ggplot(d, aes_string(x=variable, y="expression_log2vsd")) + 
-          geom_jitter(size=1.5, position = position_jitter(width=.15)) +
-          theme_bw() +
-          xlab(variable) + ylab("log2(normalized adjusted expression)") + ggtitle(ensId, subtitle = geneDescription)
+      p0=ggplot(d, aes_string(x=variable, y="expression_log2vsd")) + 
+        geom_jitter(size=1.5, position = position_jitter(width=.15)) +
+        theme_bw() +
+        xlab(variable) + ylab("log2(normalized adjusted expression)") + ggtitle(ensId, subtitle = geneDescription)
+      if(N>0 | variable=='MUSS' | variable=="Braak_Braak_stage"){
+        p0=p0+geom_boxplot(d, aes_string(x=factor(variable), y="expression_log2vsd"), position=position_dodge(.8), width=.5, outlier.shape = NA)
       }
+      ## without zero (non-expressed) genes
+      p=ggplot(filter(d, expression_raw>0), aes_string(x=variable, y="expression_log2vsd")) + 
+        geom_jitter(size=1.5, position = position_jitter(width=.15)) +
+        theme_bw() +
+        xlab(variable) + ylab("log2(normalized adjusted expression, non-zero)") + ggtitle(ensId, subtitle = geneDescription)
+      if(N>0 | variable=='MUSS' | variable=="Braak_Braak_stage"){
+        p=p+geom_boxplot(filter(d, expression_raw>0), aes_string(x=factor(variable), y="expression_log2vsd"), position=position_dodge(.8), width=.5, outlier.shape = NA)
+      }
+      
+      # if(N>0){  # factor
+      #   p0=ggplot(d, aes_string(x=variable, y="expression_log2vsd")) + 
+      #     geom_boxplot(position=position_dodge(.8), width=.5, outlier.shape = NA) +
+      #     geom_jitter(size=1.5, position = position_jitter(width=.15)) +
+      #     theme_bw() +
+      #     xlab(variable) + ylab("log2(normalized adjusted expression)") + ggtitle(ensId, subtitle = geneDescription)
+      #   ## without zero (non-expressed) genes
+      #   p=ggplot(filter(d, expression_raw>0), aes_string(x=variable, y="expression_log2vsd")) + 
+      #     geom_boxplot(position=position_dodge(.8), width=.5, outlier.shape = NA) +
+      #     geom_jitter(size=1.5, position = position_jitter(width=.15)) +
+      #     theme_bw() +
+      #     xlab(variable) + ylab("log2(normalized adjusted expression, non-zero)") + ggtitle(ensId, subtitle = geneDescription)
+      # }else{
+      #   N=3; # random number to make a nearly square figure
+      #   p0=ggplot(d, aes_string(x=variable, y="expression_log2vsd")) + 
+      #     geom_jitter(size=1.5, position = position_jitter(width=.15)) +
+      #     theme_bw() +
+      #     xlab(variable) + ylab("log2(normalized adjusted expression)") + ggtitle(ensId, subtitle = geneDescription)
+      #   ## without zero (non-expressed) genes
+      #   p=ggplot(filter(d, expression_raw>0), aes_string(x=variable, y="expression_log2vsd")) + 
+      #     geom_jitter(size=1.5, position = position_jitter(width=.15)) +
+      #     theme_bw() +
+      #     xlab(variable) + ylab("log2(normalized adjusted expression, non-zero)") + ggtitle(ensId, subtitle = geneDescription)
+      # }
+      
       #png(file.path('report/figures', imagename[i]), height = 250, width = 600)
-      pdf(file.path('report/figures', imagename[i]), height = 4, width = 1.5*N)
+      pdf(file.path('report/figures', imagename[i]), height = 4, width = max(4,1.5*N))
+      print(p0)
       print(p)
       dev.off()
     }
@@ -314,7 +354,7 @@ makeNewImages <- function(df,...){
   #                           link=paste0('figures/', imagename), 
   #                           table=FALSE, width=100)
   df$Boxplot <- hwrite('boxplot', link = paste0('figures/', imagename), table=F)
-  df$Rawdata <- hwrite("data", link = paste0('figures/', tablename), table=F)
+  df$Rawdata <- hwrite("data", link = paste0('data/', tablename), table=F)
   df$geneName <- hwrite(as.character(df$geneName), 
                         #link = paste0("http://useast.ensembl.org/",genome_name,"/Gene/Summary?db=core;g=",as.character(df$geneName)), 
                         link = paste0("https://www.genecards.org/cgi-bin/carddisp.pl?gene=",as.character(df$geneName)), 
@@ -344,9 +384,9 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   design(dds) <- as.formula(paste(" ~ ", paste(c(covariances, variable), collapse= " + ")))
   
   # Use the similar setting for single-cell RNAseq, since circRNA data here is also in ZINB distribution. See http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#recommendations-for-single-cell-analysis
-  if(gene_type=='circRNA')
+  if(scMode)
     dds <- DESeq(dds, sfType="poscounts", useT=TRUE, minmu=1e-6)
-  if(gene_type=='gene')
+  if(!scMode)
     dds <- DESeq(dds)
   
   # We tried LRT test (similar to ANOVA) below. See http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#likelihood-ratio-test
@@ -396,7 +436,7 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   write.table(as.data.frame(res), 
               file=paste("DEresult",output_dir,com_name ,"xls",sep="."), 
               sep="\t", quote =F, na="", row.names=T, col.names = NA)
-  system(paste("gzip DEresult",output_dir,com_name ,"xls",sep="."))
+  system(paste("gzip -f DEresult",output_dir,com_name ,"xls",sep="."))
   
   ## pvalue cutoff
   PVALUE_CUTOFF = ifelse(isEmpty(res$pvalue[res$padj<=0.05]), 0.05, max(res$pvalue[res$padj<=0.05],na.rm = T))  # either the pvalue corresponding to FDR=0.05 or just 0.05
@@ -469,7 +509,7 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   genetypes = sort(table(as.character(RES$geneType)), decreasing = T)
   genetypes = setNames(colorRampPalette(brewer.pal(9, "Set1"))(length(genetypes)), names(genetypes))
   ann_colors = c(geneType = list(genetypes), ann_colors)
-
+  
   ## Scale/center each genes (by rows)
   topDE=t(scale(t(as.matrix(topDE))))
   ## trim max and min
@@ -497,6 +537,46 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
            #cutree_cols=2,
            cluster_cols = F,
            clustering_distance_cols = "correlation")
+  
+  ## boxplot grouped by MUSS
+  if(variable=="MUSS"){
+    df = rownames_to_column(as.data.frame(topDE)) %>% mutate(updown=annotation_row[rowname,'updown']) %>% 
+      gather(key=var, value="norm_expression", contains("_")) %>% mutate(!!variable := annotation_col[var, variable]) 
+    df.summary = group_by(df, MUSS, updown) %>% summarise(sem=sd(norm_expression)/sqrt(length(norm_expression)), mean=mean(norm_expression))
+    
+    p=ggplot(df.summary, aes(x=MUSS,y=mean, color=updown)) +
+      geom_point(size=3)+
+      geom_line(aes(group = updown)) +
+      geom_errorbar(aes(ymin = mean-sem, ymax = mean+sem),width = 0.2)+
+      scale_color_manual(values = c("up" = "red", "down" = "blue")) +
+      theme_classic() +
+      labs(title="Top 20 MUSS associated circRNA expression", x="MUSS Stage", y = "Normalized expression")
+    print(p)
+  }
+  if(variable=="Braak_Braak_stage"){
+    df = rownames_to_column(as.data.frame(topDE)) %>% mutate(updown=annotation_row[rowname,'updown']) %>% 
+      gather(key=var, value="norm_expression", contains("_")) %>% mutate(!!variable := annotation_col[var, variable]) %>% mutate(Braak_Braak_stage2=ifelse(Braak_Braak_stage>0,ifelse(Braak_Braak_stage>2,ifelse(Braak_Braak_stage>4,"5-6","3-4"),"1-2"),"0"))
+    
+    df.summary = group_by(df, Braak_Braak_stage, updown) %>% summarise(sem=sd(norm_expression)/sqrt(length(norm_expression)), mean=mean(norm_expression))
+    p=ggplot(df.summary, aes(x=Braak_Braak_stage,y=mean, color=updown)) +
+      geom_point(size=3)+
+      geom_line(aes(group = updown)) +
+      geom_errorbar(aes(ymin = mean-sem, ymax = mean+sem),width = 0.2)+
+      scale_color_manual(values = c("up" = "red", "down" = "blue")) +
+      theme_classic() +
+      labs(title="Top 20 Braak_Braak_stage associated circRNA expression", x="Braak Braak stage", y = "Normalized expression")
+    print(p)
+    
+    df.summary = group_by(df, Braak_Braak_stage2, updown) %>% summarise(sem=sd(norm_expression)/sqrt(length(norm_expression)), mean=mean(norm_expression))
+    p=ggplot(df.summary, aes(x=Braak_Braak_stage2,y=mean, color=updown)) +
+      geom_point(size=3)+
+      geom_line(aes(group = updown)) +
+      geom_errorbar(aes(ymin = mean-sem, ymax = mean+sem),width = 0.2)+
+      scale_color_manual(values = c("up" = "red", "down" = "blue")) +
+      theme_classic() +
+      labs(title="Top 20 Braak_Braak_stage2 associated circRNA expression", x="Braak Braak stage", y = "Normalized expression")
+    print(p)
+  }
   
   DE0 = rbind(DE,DE2)
   
@@ -554,6 +634,46 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
              #cutree_cols=2,
              cluster_cols = F,
              clustering_distance_cols = "correlation")
+    
+    ## boxplot grouped by variable
+    if(variable=="MUSS"){
+      df = rownames_to_column(as.data.frame(topDE)) %>% mutate(updown=annotation_row[rowname,'updown']) %>% 
+        gather(key=var, value="norm_expression", contains("_")) %>% mutate(!!variable := annotation_col[var, variable]) 
+      df.summary = group_by(df, MUSS, updown) %>% summarise(sem=sd(norm_expression)/sqrt(length(norm_expression)), mean=mean(norm_expression))
+      
+      p=ggplot(df.summary, aes(x=MUSS,y=mean, color=updown)) +
+        geom_point(size=3)+
+        geom_line(aes(group = updown)) +
+        geom_errorbar(aes(ymin = mean-sem, ymax = mean+sem),width = 0.2)+
+        scale_color_manual(values = c("up" = "red", "down" = "blue")) +
+        theme_classic() +
+        labs(title="All MUSS associated circRNA expression", x="MUSS Stage", y = "Normalized expression")
+      print(p)
+    }
+    if(variable=="Braak_Braak_stage"){
+      df = rownames_to_column(as.data.frame(topDE)) %>% mutate(updown=annotation_row[rowname,'updown']) %>% 
+        gather(key=var, value="norm_expression", contains("_")) %>% mutate(!!variable := annotation_col[var, variable]) %>% mutate(Braak_Braak_stage2=ifelse(Braak_Braak_stage>0,ifelse(Braak_Braak_stage>2,ifelse(Braak_Braak_stage>4,"5-6","3-4"),"1-2"),"0"))
+      
+      df.summary = group_by(df, Braak_Braak_stage, updown) %>% summarise(sem=sd(norm_expression)/sqrt(length(norm_expression)), mean=mean(norm_expression))
+      p=ggplot(df.summary, aes(x=Braak_Braak_stage,y=mean, color=updown)) +
+        geom_point(size=3)+
+        geom_line(aes(group = updown)) +
+        geom_errorbar(aes(ymin = mean-sem, ymax = mean+sem),width = 0.2)+
+        scale_color_manual(values = c("up" = "red", "down" = "blue")) +
+        theme_classic() +
+        labs(title="Top 20 Braak_Braak_stage associated circRNA expression", x="Braak Braak stage", y = "Normalized expression")
+      print(p)
+      
+      df.summary = group_by(df, Braak_Braak_stage2, updown) %>% summarise(sem=sd(norm_expression)/sqrt(length(norm_expression)), mean=mean(norm_expression))
+      p=ggplot(df.summary, aes(x=Braak_Braak_stage2,y=mean, color=updown)) +
+        geom_point(size=3)+
+        geom_line(aes(group = updown)) +
+        geom_errorbar(aes(ymin = mean-sem, ymax = mean+sem),width = 0.2)+
+        scale_color_manual(values = c("up" = "red", "down" = "blue")) +
+        theme_classic() +
+        labs(title="Top 20 Braak_Braak_stage2 associated circRNA expression", x="Braak Braak stage", y = "Normalized expression")
+      print(p)
+    }
   }
   
   ## for input list of genes
@@ -673,9 +793,9 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   design(dds) <- as.formula(paste(" ~ ", paste(covariances, collapse= " + ")))
   
   # Zero-inflated NB distribution, Wald test
-  if(gene_type=='circRNA')
+  if(scMode)
     dds <- DESeq(dds, sfType="poscounts", useT=TRUE, minmu=1e-6, parallel=TRUE, BPPARAM=MulticoreParam(4))
-  if(gene_type=='gene')
+  if(!scMode)
     dds <- DESeq(dds, parallel=TRUE, BPPARAM=MulticoreParam(4))
   
   com_name= paste(variable, variable_ALT, "vs", variable_REF, sep="_")
@@ -693,7 +813,7 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   
   #Note: the independant filtering is applied by default, with the mean norm count is less than the threshold (which has the max H0 rejection, or max power, in the H0 reject vs theta plot). 
   # The adjusted p-values for the genes which do not pass the filter threshold are set to NA.  https://support.bioconductor.org/p/76144/#76147
-    
+  
   summary(res)
   head(res); dim(res)
   # decimal value of Fold-change
@@ -734,7 +854,7 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   write.table(as.data.frame(res), 
               file=paste("DEresult",output_dir,com_name ,"xls",sep="."), 
               sep="\t", quote =F, na="", row.names=T, col.names = NA)
-  system(paste("gzip DEresult",output_dir,com_name ,"xls",sep="."))
+  system(paste("gzip -f DEresult",output_dir,com_name ,"xls",sep="."))
   
   ## pvalue cutoff
   PVALUE_CUTOFF = ifelse(isEmpty(res$pvalue[res$padj<=0.05]), 0.05, max(res$pvalue[res$padj<=0.05],na.rm = T))  # either the pvalue corresponding to FDR=0.05 or just 0.05
@@ -742,7 +862,7 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   DE  = subset(res, !is.na(pvalue) & pvalue <= PVALUE_CUTOFF & abs(log2FoldChange)>=1)
   DE2 = subset(res, !is.na(pvalue) & pvalue <= PVALUE_CUTOFF & abs(log2FoldChange)<1)  
   NDE = subset(res, pvalue > PVALUE_CUTOFF)
-
+  
   # ## Note: 20% of non-significant(NS) genes are randomly selected in order to increase the performance of the generating graph
   if(nrow(NDE)>5000 && DOWNSIZE){
     n_NS=nrow(NDE)

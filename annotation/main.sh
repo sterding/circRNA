@@ -66,3 +66,11 @@ scp Merge_circexplorer_BC_RM.annotation.bb xd010@panda.dipr.partners.org:~/publi
     type bigBed 12
     parent circRNA_braincode
 
+## for Bennett
+> Merge_circexplorer_Bennett.rawcount.long.txt
+cat samplelist.Bennett.RNAseq.allN42.txt | while read i; do echo $i; awk -vi=$i '{OFS="\t"; print $1"_"$2"_"$3, $13, i}' ~/neurogen/rnaseq_Bennett/run_output/$i/circularRNA_known3.txt >> Merge_circexplorer_Bennett.rawcount.long.txt; done
+
+echo -e "chrom\tstart\tend\tID\tscore\tstrand\tthickStart\tthickEnd\titemRgb\texonCount\texonSizes\texonOffsets\tcircType\tgeneID" > Merge_circexplorer_Bennett.annotation.bed14
+cat `ls ~/neurogen/rnaseq_Bennett/run_output/*/circularRNA_known3.txt | grep -f samplelist.Bennett.RNAseq.allN42.txt -` | awk '{OFS="\t"; $5=0;$4=$1"_"$2"_"$3; print}' | cut -f1-12,14-15 | sort -u >> Merge_circexplorer_Bennett.annotation.bed14
+wc -l Merge_circexplorer_Bennett.annotation.bed14
+# 88699
