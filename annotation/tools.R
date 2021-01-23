@@ -76,3 +76,102 @@ groupmean_to_specificity <- function(groupmean){
   df = df %>% mutate(mean=groupmean[cbind(1:nrow(df), celltype)], m2sd=with(overmean,overall.mean+1*overall.sd)) %>% mutate(celltype=celltypes[celltype], Private_or_not=ifelse(S>=0.5 & mean>m2sd, 1, 0))
   return(cbind(groupmean_s, df))
 }
+
+## rewrite the disease_enrichment function in the disgenet2r package
+
+disease_enrichment_v2 <- function (genes, vocabulary = "HGNC", verbose = TRUE, gdas = disgenet_CURATED, warnings = TRUE) 
+{
+  if (length(genes) != length(unique(genes))) {
+    genes <- unique(genes)
+    warning("Removing duplicates from input genes list.")
+  }
+  type <- "symbol"
+  if (vocabulary == "HGNC") {
+  }
+  else if (vocabulary == "ENTREZ") {
+    type <- "entrez"
+  }
+  else if (class(genes[1]) == "factor") {
+    message("Your input genes are in factor format.\n    
+            Please, revise your input genes and save them as numeric or as character.")
+    stop()
+  }
+  else {
+    message(paste0("Your input genes are a wrong vocabulary ", 
+                   vocabulary, "Please, revise your input vocabulary. Remember that genes should be identified\n                   
+                   using HGNC gene symbols or NCBI Entrez identifiers"))
+    stop()
+  }
+  diseases <- unique(gdas[c("diseaseId", "diseaseName")])
+  if (type == "symbol") {
+    genes <- unique(subset(gdas, geneSymbol %in% genes)$geneId)
+    universe <- unique(as.character(gdas$geneSymbol))
+  }
+  else {
+    genes <- intersect(genes, gdas$geneId)
+    universe <- unique(as.character(gdas$geneId))
+  }
+  if (length(genes) > 0) {
+    message(paste0("A total of ", length(genes), " from the initial list are annotated in DisGENET"))
+  }
+  else {
+    stop("The list does not contain genes annotated in DisGENET \n\n
+         remember that the genes should be identified as entrez gene identifiers")
+  }
+  if (length(universe) == 1) {
+    message(paste0("A total of ", length(universe), " extracted from DisGeNET are being used as universe \n"))
+  }
+  else {
+    message(paste0("A total of ", length(universe), " are being used as universe \n"))
+  }
+  data <- data.frame(ID = character(), Description = character(), 
+                     GeneRatio = character(), BgRatio = character(), OR=numeric(), geneID = character(), 
+                     pvalue = numeric(), Count = integer(), stringsAsFactors = FALSE)
+  i <- 1
+  diseaselist <- as.character(unique(gdas[gdas$geneId %in% genes, ]$diseaseId))
+  for (dd in diseaselist) {
+    aa <- subset(gdas, diseaseId == dd)$geneId
+    inter <- length(intersect(aa, genes))
+    t <- matrix(c(inter, length(aa) - inter, length(genes) - 
+                    inter, length(universe) + inter - length(aa) - length(genes)), 
+                nrow = 2, dimnames = list(module = c("in", "out"), 
+                                          Pheno = c("phen", "nophen")))
+    test <- fisher.test(t, alternative = "greater")
+    pv <- test$p.value
+    OR <- as.numeric(test$estimate) ## Odds ratio
+    GeneRatio <- paste(inter, "/", length(genes), sep = "")
+    BgRatio <- paste(length(aa), "/", length(universe), sep = "")
+    geneID <- paste(intersect(aa, genes), collapse = "/") ## can be changed to geneSymbol 
+    data[i, ] <- c(as.character(dd), as.character(subset(diseases, diseaseId == dd)$diseaseName), 
+                   GeneRatio, BgRatio, OR, geneID, pv, inter)
+    i <- i + 1
+  }
+  data$FDR <- p.adjust(data$pvalue, method = "BH")
+  data$Count <- as.numeric(as.character(data$Count))
+  data$gg <- data$Count/length(genes)
+  data$OR <- as.numeric(data$OR)
+  data <- data[order(as.numeric(as.character(data$FDR))), ]
+  return(data)
+}
+# revised plot_enrichment @ disgenet2r package
+plot_enrichment <- function( input, cutoff , count, limit ) {
+  input<- subset(input, FDR < cutoff & Count > count  )
+  if ( dim( input )[ 1 ] > limit ){
+    input <- input[ 1:limit ,]
+    show( paste0("warning: dataframe of ", nrow(input), " rows has been reduced to ", limit, " rows." ))
+  }
+  
+  idx <- order(input$OR, decreasing = T)
+  input$Description<-factor(input$Description, levels=rev(unique(input$Description[idx])))
+  title <- "DisGeNET enrichment"
+  p <- ggplot2::ggplot(input, ggplot2::aes_string(x= input$OR, y="Description", size=input$Count, color=input$FDR)) +
+    ggplot2::geom_point() +
+    ggplot2::scale_color_continuous(low="red", high="blue", name = "FDR", guide=ggplot2::guide_colorbar(reverse=TRUE)) +
+    ggplot2::xlab("Odds Ratio") + ggplot2::ylab(NULL) +
+    ggplot2::ggtitle(title) + ggplot2::theme_bw() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(colour = "black",  size = 14, vjust = 1),
+                   axis.text.y = ggplot2::element_text(colour = "black", size = 14, hjust = 1),
+                   axis.title = ggplot2::element_text(margin = ggplot2::margin(10, 5, 0, 0), color = "black", size = 12),
+                   axis.title.y = ggplot2::element_text(angle = 90)) + ggplot2::scale_size(range=c(3, 8))
+  print(p)
+}

@@ -21,6 +21,7 @@ head(subjectTable); head(sampleTable);
 dim(sampleTable) # n=284
 
 ## PD pathology group table
+## Note: CONDITION includes PD, ILB, and HC; CONDITION2 includes PD (PD+ILB) and HC;
 left_join(x=sampleTable, y=subjectTable, by = "SUBJECT_ID") %>% filter(CELLTYPE=="SNDA") %>% 
   select(SUBJECT_ID, CONDITION, AGE, SEX, PMI, MUSS, Unified_LB_Stage, PD.pathology.group, SAMPLE_ID, CELLTYPE, BATCH, RIN) %>% 
   mutate(PDpathologygroup=ifelse(PD.pathology.group=="no","hc",ifelse(PD.pathology.group=="late" | PD.pathology.group=="early","pd",PD.pathology.group))) %>%

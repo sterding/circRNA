@@ -67,13 +67,14 @@ dim(Merge_circexp_raw); head(Merge_circexp_raw)
 Merge_circexp_raw_PD=select(Merge_circexp_raw, starts_with("PD")); dim(Merge_circexp_raw_PD)
 Merge_circexp_raw_filtered_PD=Merge_circexp_raw_PD[rowSums(Merge_circexp_raw_PD)>=2,]; 
 dim(Merge_circexp_raw_filtered_PD)
-SNDA=readRDS("Merge_circexplorer_BC197.filtered.rawcount.rds")
+SNDA=readRDS("Merge_circexplorer_BC190.filtered.rawcount.rds")
 ########## TODO
 head(SNDA); dim(SNDA);
-Merge_circexp_raw_SNDA=select(SNDA, contains("PD")); head(Merge_circexp_raw_SNDA)
+Merge_circexp_raw_SNDA=select(SNDA, contains("SNDA")); head(Merge_circexp_raw_SNDA)
 Merge_circexp_raw_filtered_SNDA=Merge_circexp_raw_SNDA[rowSums(Merge_circexp_raw_SNDA)>0,]
 dim(Merge_circexp_raw_filtered_SNDA)
 sum(rownames(Merge_circexp_raw_filtered_PD) %in% rownames(Merge_circexp_raw_filtered_SNDA))
+# 148
 
 # collapsed to gene level
 table((filter(readRDS("Merge_circexplorer_CSF87.annotation.bed14.rds"),ID %in% rownames(Merge_circexp_raw_filtered_PD)) %>%
@@ -157,5 +158,7 @@ Merge_circexp_raw_filtered_and_enriched = readRDS(file="Merge_circexplorer_CSF87
 DE=read.table("../results/DE_SNDA/DEresult.DE_SNDA.CONDITION2_PD_vs_HC.xls", header=T, sep="\t", row.names = 1, stringsAsFactors = F)  %>% rownames_to_column("ID")  %>% select(-contains("ind_raw")) # %>% filter(log2FoldChange>1 | log2FoldChange < -1)
 head(DE)
 # join
-inner_join(x=annotation_filtered, y=DE, by="ID")
+inner_join(x=annotation_filtered, y=DE, by="ID") %>% filter(pvalue<=0.05)  
+# None
+
 rowSums(Merge_circexp_raw_filtered_and_enriched['chrX_139865339_139866824',])

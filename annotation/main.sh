@@ -48,23 +48,162 @@ wc -l Merge_circexplorer_RM12.annotation.bed14
 # 267,398
 
 ## BC+RM
-cat Merge_circexplorer_BC221.annotation.bed14 Merge_circexplorer_RM12.annotation.bed14 | grep -v chrom | sort -k1,1 -k2,2n -u  >  Merge_circexplorer_BC_RM.annotation.bed14
+cat Merge_circexplorer_BC221.annotation.bed14 Merge_circexplorer_RM12.annotation.bed14 | grep -v chrom | sort -k1,1 -k2,2n -k3,3n -u  >  Merge_circexplorer_BC_RM.annotation.bed14
 
-
+#########################################
+## tracks for UCSC Genome Browser
+#########################################
 ## track for UCSC 
-awk '{OFS="\t";$9=($13=="circRNA")?(($6=="+")?"255,0,0":"0,0,255"):(($6=="+")?"255,100,100":"100,100,255");print}' Merge_circexplorer_BC_RM.annotation.bed14 | cut -f1-12 >  Merge_circexplorer_BC_RM.annotation.bed12
+mkdir ~/projects/circRNA/data/ucsc_tracks;
+cd ~/projects/circRNA/data/ucsc_tracks;
+awk '{OFS="\t";$9=($13=="circRNA")?(($6=="+")?"255,0,0":"0,0,255"):(($6=="+")?"255,100,100":"100,100,255");print}' ../Merge_circexplorer_BC_RM.annotation.bed14 | cut -f1-12 | sort -k1,1 -k2,2n >  Merge_circexplorer_BC_RM.annotation.bed12
 bedToBigBed -type=bed12 Merge_circexplorer_BC_RM.annotation.bed12 ~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/hg19.chrom.size Merge_circexplorer_BC_RM.annotation.bb
-chmod 644 Merge_circexplorer_BC_RM.annotation.bb;
-scp Merge_circexplorer_BC_RM.annotation.bb xd010@panda.dipr.partners.org:~/public_html/tracks
+rsync -a --chmod=u+rw,go+r Merge_circexplorer_BC_RM.annotation.bb xd010@panda.dipr.partners.org:~/public_html/tracks
+
+# separate by cell type
+for i in SNDA PY NN; do echo $i; bedToBigBed -type=bed12 Merge_circexplorer_BC197.filtered.enriched.annotation.$i.bed12 ~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/hg19.chrom.size Merge_circexplorer_BC197.filtered.enriched.annotation.$i.bb; done
+rsync -a --chmod=u+rw,go+r Merge_circexplorer_BC197.filtered.enriched.annotation.*.bb xd010@panda.dipr.partners.org:~/public_html/tracks
+
+
+## bigBarChart for 197 samples
+# require to run main.R to get Merge_circexplorer_BC197.filtered.enriched.normRPM.tab and Merge_circexplorer_BC197.filtered.enriched.annotation.bed14
+# - matrixFile: 
+ln -fs ../Merge_circexplorer_BC197.filtered.enriched.normRPM.tab Merge_circexplorer_BC197.filtered.enriched.normRPM.tab
+# - sampleFile: 
+head -n1 Merge_circexplorer_BC197.filtered.enriched.normRPM.tab | rowsToCols stdin stdout | awk '{OFS="\t"; split($1,a,"_"); print $1,a[1]"_"a[3];}' > Merge_circexplorer_BC197.filtered.enriched.sampleFile
+# - bedFile (bed6+1): 
+cut -f1-6,15 ../Merge_circexplorer_BC197.filtered.enriched.annotation.bed14 > Merge_circexplorer_BC197.filtered.enriched.annotation.bed6+1
+# - GROUPORDERFILE
+echo HC_SNDA ILB_SNDA PD_SNDA HC_TCPY AD_TCPY HC_MCPY HC_FB HC_PBMC | rowsToCols stdin GROUPORDERFILE
+expMatrixToBarchartBed  --useMean --groupOrderFile GROUPORDERFILE Merge_circexplorer_BC197.filtered.enriched.sampleFile Merge_circexplorer_BC197.filtered.enriched.normRPM.tab Merge_circexplorer_BC197.filtered.enriched.annotation.bed6+1 Merge_circexplorer_BC197.filtered.enriched.BarChart.bed
+wget https://genome.ucsc.edu/goldenPath/help/examples/barChart/barChartBed.as
+sort -k1,1 -k2,2n Merge_circexplorer_BC197.filtered.enriched.BarChart.bed > Merge_circexplorer_BC197.filtered.enriched.BarChart.bed.sorted;
+bedToBigBed -as=barChartBed.as -type=bed6+5 Merge_circexplorer_BC197.filtered.enriched.BarChart.bed.sorted ~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/hg19.chrom.size Merge_circexplorer_BC197.filtered.enriched.BarChart.bb
+
+## bigbed for 197 samples, separately by celltype
+Merge_circexplorer_BC197.filtered.enriched.normRPM.tab
 # add the following description to http://panda.partners.org/~xd010/myHub/hg19/trackDb.circRNA.txt
-    track BC_BM_circRNAs
+
+echo "
+track circRNA
+shortLabel circRNA
+longLabel BRAINcode circRNA datasets
+dataVersion Version 1 (June 2020)
+type bed 3
+visibility full
+boxedCfg on
+priority 24
+superTrack on show
+
+    track published_circRNA
+    compositeTrack on
+    parent circRNA
+    shortLabel published_circRNA
+    type bigBed 12
+    allButtonPair on
+    
+        track jeck_circRNAs
+        bigDataUrl http://bimsbstatic.mdc-berlin.de/hubs/rajewsky/circBase/hg19/Jeck2013_sorted_coloured.bb
+        shortLabel jeck2013
+        longLabel Jeck et al. 2013 circular RNA candidates
+        itemRgb off
+        type bigBed 12
+        parent published_circRNA
+        
+        track salzman_circRNAs
+        bigDataUrl http://bimsbstatic.mdc-berlin.de/hubs/rajewsky/circBase/hg19/Salzman2013_sorted.bb
+        shortLabel salzman2013
+        longLabel Salzman et al. 2013 circular RNA candidates
+        itemRgb off
+        type bigBed 12
+        parent published_circRNA
+        
+        track memczak_circRNAs
+        bigDataUrl http://bimsbstatic.mdc-berlin.de/hubs/rajewsky/circBase/hg19/Memczak2013_circRNAs.bb
+        shortLabel memczak2013
+        longLabel Memczak et al. 2013 circular RNA candidates
+        itemRgb off
+        type bigBed 12
+        parent published_circRNA
+        
+        track zhang_circRNAs
+        bigDataUrl http://bimsbstatic.mdc-berlin.de/hubs/rajewsky/circBase/hg19/Zhang2013_circRNAs.bb
+        shortLabel zhang2013
+        longLabel Zhang et al. 2013 circular RNA candidates
+        itemRgb off
+        type bigBed 12
+        parent published_circRNA
+        
+        track rybak_circRNAs
+        bigDataUrl http://bimsbstatic.mdc-berlin.de/hubs/rajewsky/circBase/hg19/Rybak2015_circRNAs.bb
+        shortLabel rybak2015
+        longLabel Rybak et al. 2015 circular RNA candidates
+        itemRgb off
+        type bigBed 12
+        parent published_circRNA
+
+    track circRNA_BC2_filtered
+    compositeTrack on
+    parent circRNA
+    shortLabel circRNA_BC2_filtered
+    type bigBed 12
+    allButtonPair on
+    
+        track circRNA_BC2_filtered_SNDA
+        bigDataUrl http://pd:brain@panda.partners.org/~xd010/tracks/Merge_circexplorer_BC197.filtered.enriched.annotation.SNDA.bb
+        shortLabel circRNA_BC2_filtered_SNDA
+        longLabel Filtered and enriched circRNAs in BRAINcode2 (dopamine neuron, N=104)
+        itemRgb on
+        type bigBed 12
+        parent circRNA_BC2_filtered
+
+        track circRNA_BC2_filtered_PY
+        bigDataUrl http://pd:brain@panda.partners.org/~xd010/tracks/Merge_circexplorer_BC197.filtered.enriched.annotation.PY.bb
+        shortLabel circRNA_BC2_filtered_PY
+        longLabel Filtered and enriched circRNAs in BRAINcode2 (pyramidal neuron, N=86)
+        itemRgb on
+        type bigBed 12
+        parent circRNA_BC2_filtered
+        
+        track circRNA_BC2_filtered_NN
+        bigDataUrl http://pd:brain@panda.partners.org/~xd010/tracks/Merge_circexplorer_BC197.filtered.enriched.annotation.NN.bb
+        shortLabel circRNA_BC2_filtered_NN
+        longLabel Filtered and enriched circRNAs in BRAINcode2 (non-neuronal cells, N=7)
+        itemRgb on
+        type bigBed 12
+        parent circRNA_BC2_filtered
+
+        track circRNA_BC2_filtered_barchart
+        type bigBarChart
+        visibility full
+        shortLabel circRNA_BC2_filtered_barchart
+        longLabel Filtered and enriched circRNAs in BRAINcode2 (N=197)
+        barChartBars HC_SNDA ILB_SNDA PD_SNDA HC_TCPY AD_TCPY HC_MCPY HC_FB HC_PBMC
+        barChartColors #F22A7B #E44892 #A24B9C #3182BD #ED6120 #2659B2 #BC9371 #D3CBCB
+        barChartLabel Celltype
+        barChartMetric mean
+        barChartUnit RPM
+        bigDataUrl http://pd:brain@panda.partners.org/~xd010/tracks/Merge_circexplorer_BC197.filtered.enriched.BarChart.bb
+        barChartMatrixUrl http://pd:brain@panda.partners.org/~xd010/tracks/Merge_circexplorer_BC197.filtered.enriched.normRPM.tab
+        barChartSampleUrl http://pd:brain@panda.partners.org/~xd010/tracks/Merge_circexplorer_BC197.filtered.enriched.sampleFile
+        parent circRNA_BC2_filtered
+        
+    track circularRNA_BC2+RM_all
     bigDataUrl http://pd:brain@panda.partners.org/~xd010/tracks/Merge_circexplorer_BC_RM.annotation.bb
-    shortLabel BC_RM_circularRNA
-    longLabel Circular RNAs from all RM (n=12) and BC (n=221) samples (see main.sh in src)
+    shortLabel circularRNA_BC2+RM_all
+    longLabel Circular RNAs from all RM (n=12) and BC2 (n=221) samples (see main.sh in src)
     visibility pack
     itemRgb on
     type bigBed 12
-    parent circRNA_braincode
+    parent circRNA
+
+" > trackDb.circRNA.txt
+rsync -a --chmod=u+rw,go+r --copy-links trackDb.circRNA.txt xd010@panda.dipr.partners.org:~/public_html/myHub/hg19/
+rsync -a --chmod=u+rw,go+r --copy-links *.bb xd010@panda.dipr.partners.org:~/public_html/tracks/
+rsync -a --chmod=u+rw,go+r --copy-links *.tab xd010@panda.dipr.partners.org:~/public_html/tracks/
+rsync -a --chmod=u+rw,go+r --copy-links *.sampleFile xd010@panda.dipr.partners.org:~/public_html/tracks/
+
+
 
 ## for Bennett
 > Merge_circexplorer_Bennett.rawcount.long.txt

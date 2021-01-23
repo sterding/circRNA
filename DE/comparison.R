@@ -66,12 +66,22 @@ dev.off()
 ### =======================
 ## DE2gene_TCPY vs. DE2gene_SNDA
 ### =======================
-df1=read.table("DE2gene_TCPY/DEresult.DE2gene_TCPY.CONDITION_AD_vs_HC.xls", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
-df2=read.table("DE2gene_SNDA/DEresult.DE2gene_SNDA.CONDITION2_PD_vs_HC.xls", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
-df1df2 = inner_join(rownames_to_column(df1) %>% filter(pvalue<=1) %>% select(1:8), 
-                    rownames_to_column(df2) %>% filter(pvalue<=1) %>% select(1:13), 
+df1=read.table("DE2gene_TCPY/DEresult.DE2gene_TCPY.CONDITION_AD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df2=read.table("DE2gene_SNDA/DEresult.DE2gene_SNDA.CONDITION2_PD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df1df2 = inner_join(rownames_to_column(df1) %>% filter(pvalue<=1) %>% select(1:8),
+                    rownames_to_column(df2) %>% filter(pvalue<=1) %>% select(1:13),
                     by = 'rowname') # %>% mutate(log2FoldChange.y=-1*log2FoldChange.y) # sign of fold change for continous variable?
-head(df1df2)
+## Actually, if including circRNAs tested in either AD or PD, we should use full_join (below), which will be 820 circRNA genes in total. In this figure, we only include those tested in BOTH AD and PD. That would be 423. 
+# df1df2 = full_join(rownames_to_column(df1) %>% filter(pvalue<=1) %>% select(1:8), 
+#                     rownames_to_column(df2) %>% filter(pvalue<=1) %>% select(1:13), 
+#                     by = 'rowname') %>% mutate(pvalue.x = ifelse(is.na(pvalue.x), 1, pvalue.x),
+#                                                pvalue.y = ifelse(is.na(pvalue.y), 1, pvalue.y),
+#                                                FoldChange.x = ifelse(is.na(FoldChange.x), 0, FoldChange.x),
+#                                                FoldChange.y = ifelse(is.na(FoldChange.y), 0, FoldChange.y))
+dim(df1df2)
+# test if AD and PD associated circRNAs are significantly overlapped?
+fisher.test(with(df1df2, table(pvalue.x<=0.05, pvalue.y<=0.05)))
+# p-value =1 
 
 pdf(file = "ADPD.DE2gene.barplot.pdf", paper = 'US')
 
@@ -96,12 +106,18 @@ filter(df1df2, pvalue.x<=0.05 | pvalue.y<=0.05) %>% mutate(Chr=genes_annotation$
 gplots::venn(list(AD = rownames(subset(df1, pvalue<=0.05)), PD = rownames(subset(df2, pvalue<=0.05))))
 
 # barplot
-df = filter(df1df2, pvalue.x<=0.05 | pvalue.y<=0.05) %>% mutate(log2FoldChangeX = log2FoldChange.x>0, log2FoldChangeY = log2FoldChange.y>0) %>%
-  arrange(log2FoldChangeX, log2FoldChangeY, log2FoldChange.x) %>% 
+df = filter(df1df2, pvalue.x<=0.05 | pvalue.y<=0.05) %>% mutate(log2FoldChangeX = log2FoldChange.x>=0, log2FoldChangeY = log2FoldChange.y>=0) %>%
+  arrange(log2FoldChangeX, -log2FoldChangeY, log2FoldChange.x) %>% 
   mutate(genename = rowname) %>%
-  select(genename, AD_vs_HC=log2FoldChange.x, PD_vs_HC=log2FoldChange.y) 
+  select(genename, log2FoldChange.x, log2FoldChange.y, pvalue.x, pvalue.y) 
 df$genename= factor(df$genename, levels = as.character(df$genename))
-p= ggplot(gather(df, key="comparison", value="log2FoldChange", 2:3), aes(x=genename, y=log2FoldChange, fill=comparison)) +
+
+df = df %>% gather(key, value, -genename) %>% 
+  extract(key, c("merit", "comparison"), "(.*)\\.(.*)") %>% 
+  spread(merit, value) %>% 
+  mutate(comparison = case_when(comparison=="x" ~ "AD_vs_HC", comparison=="y" ~ "PD_vs_HC"))
+
+p= df %>% ggplot(aes(x=genename, y=log2FoldChange, fill=comparison, alpha=pvalue<0.05)) +
   geom_bar(stat="identity", position=position_dodge()) + coord_flip()  + 
   # geom_text(aes(label=paste0(observed," (",round(OR,1),")")), position = position_dodge(width=1), hjust=0, vjust=.5, angle = 90, size=2.5) +  # TODO: add significance *
   theme_minimal() + theme(legend.justification=c(1,0), legend.position=c(1,0))

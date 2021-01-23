@@ -36,15 +36,15 @@ invnorm <- function(indpval, nrep, BHth = 0.05) {
   names(listres) = c("DEindices", "TestStatistic", "rawpval", "adjpval") 
   return(listres)
 }
-library(dplyr)
+library(tidyverse)
 setwd("~/projects/circRNA/results/")
 
 
-res_TCPY_AD = read.table("DE2gene_TCPY/DEresult.DE2gene_TCPY.CONDITION_AD_vs_HC.xls", header = T, stringsAsFactors = F, sep = "\t", row.names = 1)
+res_TCPY_AD = read.table("DE2gene_TCPY/DEresult.DE2gene_TCPY.CONDITION_AD_vs_HC.xls.gz", header = T, stringsAsFactors = F, sep = "\t", row.names = 1)
 head(res_TCPY_AD); dim(res_TCPY_AD)
 
 Ns = list(BM10=154,BM22=135,BM36=132,BM44=129)
-i=4
+i=2
 for(i in 1:4)
 {
   res_NN_AD = read.table(paste0("../data/Dube2019NN/meta_both_condition_",names(Ns)[i],"_table_Box.txt"), skip = 3, stringsAsFactors = F, sep = "\t", row.names = 1, 
@@ -53,8 +53,11 @@ for(i in 1:4)
   # trim
   res_TCPY_AD_trim = res_TCPY_AD[intersect(rownames(res_TCPY_AD),rownames(res_NN_AD)),]
   res_NN_AD_trim = res_NN_AD[intersect(rownames(res_TCPY_AD),rownames(res_NN_AD)),]
-  #dim(res_NN_AD_trim); dim(res_TCPY_AD_trim)
+  dim(res_NN_AD_trim); dim(res_TCPY_AD_trim)
   rawpval_AD = list("pval1"=res_TCPY_AD_trim[["pvalue"]],"pval2"=res_NN_AD_trim[["pvalue_MSBB"]])
+  # how many significant ones in discovery also signicant in replication?
+  replicated = cbind(res_TCPY_AD_trim[rawpval_AD$pval1<0.05 & rawpval_AD$pval2<0.05, 1:12], res_NN_AD_trim[rawpval_AD$pval1<0.05 & rawpval_AD$pval2<0.05,])
+  cor(replicated$log2FoldChange, replicated$log2FC_MSBB)
   
   invnormcomb_AD = invnorm(rawpval_AD,nrep=c(83,as.numeric(Ns)[i]), BHth = 0.05)
   invnormcomb_AD$DEindices <- NULL

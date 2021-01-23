@@ -36,6 +36,10 @@ Merge_circexp_norm_filtered_and_enriched = select(Merge_circexp_norm_filtered_an
 Merge_circexp_norm_filtered_and_enriched = Merge_circexp_norm_filtered_and_enriched[rowMeans(Merge_circexp_norm_filtered_and_enriched)>0,]
 dim(Merge_circexp_norm_filtered_and_enriched); dim(annotation)
 # 11636   109
+
+# two validated circRNAs from ERC1 (Note: mean of non-zero expression goes to Fig. 2e)
+Merge_circexp_raw_filtered_and_enriched=select(readRDS("Merge_circexplorer_BC197.filtered.enriched.rawcount.rds"), starts_with("HC_"))
+Merge_circexp_raw_filtered_and_enriched['chr12_1480998_1519619',]  # mean of non-zero expression
 ###########################################
 ## circRNA expressed in each cell #########
 ###########################################
@@ -119,6 +123,7 @@ group3mean = df %>% mutate(gene=rownames(df)) %>% melt(id.vars="gene", variable.
   mutate(cellType=factor(cellType, levels = c("SNDA","PY","NN"))) %>% # redefine factor of cellType
   dcast(gene ~ cellType, value.var='meanFPKM')
 
+## cell-specific circRNAs based on 3 major groups
 groupmean_s3 = groupmean_to_specificity(group3mean)
 df3 = groupmean_s3 %>% filter(Private_or_not==1) ## n = 9694
 group_by(df3, celltype) %>% summarise(count=n())
@@ -143,6 +148,71 @@ rbind(data.frame(gene=df3$gene, DF="df3"), data.frame(gene=df5$gene, DF="df5")) 
 # 1 df3       859
 # 2 df3,df5  8835
 # 3 df5       447
+
+# Consistence of the qPCR validated ones in cell-specificity
+library(googlesheets4)
+qPCR_validated = read_sheet("16xwR1MjCJKzkhfEk3yfjpf9JEOPUWnkLuL0HRdGT6XY", sheet="Table S2. qPCR.circRNAs") # https://docs.google.com/spreadsheets/d/16xwR1MjCJKzkhfEk3yfjpf9JEOPUWnkLuL0HRdGT6XY/edit
+# join group3mean and groupmean_s3
+write_sheet(left_join(qPCR_validated, rename_if(group3mean, is.numeric, list(~str_c("mean.lcRNAseq.", .))), by=c("circRNA_ID" = "gene")) %>% 
+              left_join(y=groupmean_s3, by = c("circRNA_ID" = "gene")), ss="16xwR1MjCJKzkhfEk3yfjpf9JEOPUWnkLuL0HRdGT6XY", sheet="Table S2. qPCR.circRNAs")
+
+
+###########################################
+# Clustering 109 samples based on cell specific circRNAs, using tSNE
+###########################################
+# input: df3 (the cell-specific circRNAs baesd on major groups)
+res=t(Merge_circexp_norm_filtered_and_enriched[df3$gene,])  # sample on the row, gene on the columns
+#dim(res)
+#res=log10(res*1000+1)
+##Cell Type
+cellType = do.call("rbind",strsplit(rownames(res),"_"))[,3]
+cellType = factor(cellType, levels = c("SNDA", "TCPY", "MCPY", "PBMC", "FB"))
+
+## PCA
+# # note: According to the R help, SVD has slightly better numerical accuracy. Therefore, the function prcomp() is preferred compared to princomp().
+# # see ref: http://www.sthda.com/english/articles/31-principal-component-methods-in-r-practical-guide/118-principal-component-analysis-in-r-prcomp-vs-princomp/
+# res.pca = prcomp(res, scale = F)
+# library(factoextra) # install.packages("factoextra")
+# fviz_eig(res.pca) 
+# fviz_pca_ind(res.pca,
+#              col.ind = "cos2", # Color by the quality of representation
+#              gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+#              repel = TRUE     # Avoid text overlapping
+# )
+
+## t-SNE
+set.seed(1) # for reproducibility
+library(Rtsne) # install.packages("Rtsne")
+
+pdf("../results/Merge_circexplorer_BC109.tSNE.PCA.plot.pdf", width=10, height=10)
+xy <- Rtsne(res, dims = 2, perplexity=30, max_iter = 500)$Y
+# visualizing
+colors = c("#F22A7B", "#0029DB", "#CC00FF", "#00FF66FF", "#CCFF00FF")
+names(colors) = unique(cellType)
+
+plot(xy, t='p', main="t-SNE", col="black", pch = 21, bg = colors[cellType], 
+     cex.axis=1.5, cex.lab=1.5, cex=1.5, 
+     xlim=range(xy[,1])*1.2, ylim=range(xy[,2])*1.2)
+legend("topleft", cex = 1, bty = "n", 
+       legend = c("SNDA", "TCPY", "MCPY", "PBMC", "FB"), 
+       text.col = "black", col = "black" ,pch = 21, 
+       pt.bg = c("#F22A7B", "#0029DB", "#CC00FF", "#00FF66FF", "#CCFF00FF")
+)
+dev.off()
+
+## UMAP
+# library(umap) #install.packages('umap')
+# xy = umap(res)$layout
+# # plot umap
+# plot(xy, t='p', main="UMAP", col="black", pch = 21, bg = colors[cellType], 
+#      cex.axis=1.5, cex.lab=1.5, cex=1.5, 
+#      xlim=range(xy[,1])*1.2, ylim=range(xy[,2])*1.2)
+# legend("topleft", cex = 1, bty = "n", 
+#        legend = c("SNDA", "TCPY", "MCPY", "PBMC", "FB"), 
+#        text.col = "black",col = "black", pch = 21,
+#        pt.bg = c("#F22A7B", "#0029DB", "#CC00FF", "#00FF66FF", "#CCFF00FF")
+# )
+
 
 ###########################################
 # heatmpa of cell specific circRNAs
@@ -205,19 +275,23 @@ rbind(data.frame(gene=df3$gene, DF="df3"), data.frame(gene=df5$gene, DF="df5")) 
 groupmean = group5mean; rownames(groupmean)=groupmean[,1]; groupmean=groupmean[,-1]
 df=log10(groupmean[df3$gene,]*1000+1)
 celltypes=colnames(df)
+# cluster columns
 dissimilarity <- 1 - cor(df)
 distance <- as.dist(dissimilarity)
 hc=hclust(distance)
 hccol=as.dendrogram(hc)
-weights.dd <- order(match(c("PBMC","FB","SNDA","TCPY","MCPY"), celltypes)) # the trick is to call order() on the specific index of target dendragram (see https://www.biostars.org/p/237067/#260551)
-#plot(reorder(hccol, wts = weights.dd))
-#library("dendsort") # install.packages('dendsort')
-#plot(dendsort(hc))
+weights.dd <- order(match(c("SNDA","TCPY","MCPY","PBMC","FB"), celltypes)) # the trick is to call order() on the specific index of target dendragram (see https://www.biostars.org/p/237067/#260551)
+hccol=as.hclust(reorder(hccol, wts = weights.dd, agglo.FUN = max))
 
-
+# cluster rows
 dissimilarity <- 1 - cor(t(df))
 distance <- as.dist(dissimilarity)
 hcrow=hclust(distance, method = 'average')
+## reorder to make sure in the same order as columns, e.g. SNDA-TCPY-MCPY-PBMC-FB
+hcrow=as.dendrogram(hcrow)
+neworder = c(labels(hcrow)[4861:nrow(df)],labels(hcrow)[1:4860])  # 4860 is the total number of NN-specific genes
+weights.rows <- order(match(neworder,rownames(df)))
+hcrow=as.hclust(reorder(hcrow, wts = weights.rows, agglo.FUN=max))
 #plot(dendsort(hcrow))
 roworders = hcrow$order # order of the new rows in the old matrix
 library(RColorBrewer) 
@@ -230,7 +304,7 @@ hm.parameters <- list(df,
                       kmeans_k = NA,
                       show_rownames = F, show_colnames = T,
                       clustering_method = "average",
-                      cluster_rows = hcrow, cluster_cols = as.hclust(reorder(hccol, wts = weights.dd, agglo.FUN = max)),
+                      cluster_rows = hcrow, cluster_cols = hccol,
                       #cluster_rows = T, cluster_cols = T,
                       cutree_cols = 5,#cutree_rows =5, # to allow small gap space between columns
                       clustering_distance_rows = 'correlation', 
@@ -257,10 +331,20 @@ DF3 %>% dplyr::select(hostgene, celltype) %>% distinct() %>% group_by(celltype) 
 # 2 PY        1814
 # 3 SNDA      1102
 
-## save the list into table for downstream GO analysis
+## save the host gene list into table for downstream functional enrichment analysis
 DF3 %>% dplyr::select(celltype, hostgene) %>% distinct() %>% group_by(celltype) %>% mutate(n=n(), hostgene = paste0(unique(hostgene), collapse = ";")) %>% distinct() %>% write.table(file="../results/Merge_circexplorer_BC109.cellspecific_heatmap5.genes3.txt", sep = "\t", col.names = T, quote=F, row.names = F)
 DF3 %>% dplyr::select(celltype, hostgeneID) %>% mutate(hostgeneID=sub("\\..*","",hostgeneID)) %>% distinct() %>% group_by(celltype) %>% mutate(n=n(), hostgeneID = paste0(unique(hostgeneID), collapse = ";")) %>% distinct() %>% write.table(file="../results/Merge_circexplorer_BC109.cellspecific_heatmap5.genes3.EnsID.txt", sep = "\t", col.names = T, quote=F, row.names = F)
-## GO to DAVID website to run KEGG pathway analysis, then go to getTissueSpecificRNA.makingGObarplot.R to make the figures
+## 1. GO to DAVID website to run KEGG pathway analysis, then go to getTissueSpecificRNA.makingGObarplot.R to make the figures
+## 2. run DisGeNET enrichment analysis for the host genes of private circRNAs
+source("../src/annotation/tools.R")  # rewrite some of DisGeNET functions
+gsd=readRDS("~/neurogen/external_download/externalData/others/DisGeNET.curated_gene_disease_associations.RDS") %>% select(geneId, geneSymbol, diseaseId, diseaseName) %>% distinct()
+for(i in c("NN","PY","SNDA")) {
+  disease_enrichment_v2(genes = unique(subset(DF3, celltype==i, select = 'hostgene',drop = T)), gdas = gsd) %>% 
+    filter(Count>3, FDR<0.05) %>% 
+    select("ID","Description", "pvalue", "FDR", "GeneRatio",  "BgRatio","OR") %>% 
+    write.table(paste0("../results/Merge_circexplorer_BC109.cellspecific_heatmap5.genes3.",i,".DisGeNet.xls"),sep="\t", na="", row.names=F) 
+}
+
 
 ## divide into venn diagram --> ## call eulerAPE to generate Merge_circexplorer_BC109.cellspecific_heatmap5.genes3.venn_final.pdf
 DF3 %>% arrange(celltype, hostgene)%>% group_by(hostgene) %>% summarize(celltype3 = paste(unique(celltype), collapse = ',')) %>% group_by(celltype3) %>% summarise(n=n(), gene3 = paste(unique(hostgene), collapse = ';'))
@@ -312,6 +396,9 @@ DF3 = inner_join(DF3, gene_groupmean_s3_DF3,by = c("hostgeneID" = "gene"), suffi
 DF3 = mutate(DF3, celltype.specific.gene = ifelse(Private_or_not.gene==1, celltype.gene, "NS"))
 dim(DF3)
 
+## save the cell specificty table
+write.table(DF3, file = "../results/Merge_circexplorer_BC109.cellspecificity.circRNA3.genes3.xls",sep="\t", na="", row.names=F)
+
 ## Any host genes for cell-specific circRNAs are private genes? None!
 for(i in c("NN","PY","SNDA")) {print(i); filter(DF3, celltype.circRNA==i, Private_or_not.gene==1) %>% dplyr::select(hostgene, celltype.gene) %>% distinct()%>% group_by(celltype.gene) %>% summarise(n=n()) %>% print()}
 # or table(dplyr::select(DF3, Private_or_not.circRNA, Private_or_not.gene))
@@ -342,6 +429,9 @@ ggsave("../results/Merge_circexplorer_BC109.cellspecific_barplot++.hostgene.pdf"
 # 2 PY              570
 # 3 SNDA            383
 
+## expression level of parental genes of specific circRNAs in each cell type
+
+
 ## spec.circRNA vs. spec.gene for the same cell type
 xx=DF3 %>% mutate(x=match(paste0(celltype.circRNA,"_spec.gene"), colnames(DF3))) 
 xx = xx %>% mutate(S.circRNA.gene = DF3[cbind(seq_along(x), x)]) %>% dplyr::select(celltype.circRNA, S.circRNA, S.circRNA.gene) %>% gather("circRNA_or_gene", "specificity_score", -1, convert = T) %>% mutate(circRNA_or_gene=as.factor(circRNA_or_gene), celltype.circRNA=as.factor(celltype.circRNA), specificity_score=as.numeric(specificity_score))
@@ -362,10 +452,14 @@ dissimilarity <- 1 - cor(X)
 distance <- as.dist(dissimilarity)
 hc=hclust(distance)
 hccol=as.dendrogram(hc)
-weights.dd <- order(match(c("PBMC","FB","SNDA","TCPY","MCPY"), colnames(X))) # the trick is to call order() on the specific index of target dendragram
+weights.dd <- order(match(c("SNDA","TCPY","MCPY","PBMC","FB"), colnames(X))) # the trick is to call order() on the specific index of target dendragram
 #plot(reorder(hccol, wts = weights.dd, agglo.FUN = mean))
 
 my_gene_col <- data.frame(celltype=DF3$celltype.circRNA, row.names = rownames(X))
+# Specify colors
+ann_colors = list(
+  celltype = c(SNDA="#F22A7B",PY="#3182bd", NN="#513931")
+)
 
 hm.parameters <- list(X, 
                       color = colorRampPalette(c("#999999","#ffffff", "#ca0020"))(100),
@@ -374,7 +468,7 @@ hm.parameters <- list(X,
                       treeheight_col = 30,
                       kmeans_k = NA,
                       show_rownames = F, show_colnames = T,
-                      annotation_row = my_gene_col,
+                      annotation_row = my_gene_col, annotation_colors = ann_colors,
                       cutree_cols = 5, # to allow small gap space between columns
                       cluster_rows = F, cluster_cols = as.hclust(reorder(hccol, wts = weights.dd, agglo.FUN = mean)))
 library(pheatmap);
