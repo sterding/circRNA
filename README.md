@@ -1,6 +1,6 @@
 # Script repository for circRNA analysis
 
-Xianjun Dong, 2022/11/11
+Update on 2022/11/11 by Xianjun Dong, PhD
 
 ## Introduction
 
