@@ -1,23 +1,23 @@
-# BRAINcodev2 -- circRNA analysis
+# Script repository for circRNA analysis
 
 Xianjun Dong, 2022/11/11
 
 ## Introduction
 
-As part of the [BRAINcode](http://www.humanbraincode.org) project, we studied the circRNAs in 197 human samples, including 190 human brain neuronal samples and 7 non-neuronal samples in this study. In detail, dopaminergic neurons (DA) from the midbrain substantia nigra pars compacta of 104 high-quality human brains (DA; HC: n = 59; ILB: n = 27; PD: n = 18), pyramidal neurons from layers V/VI of the middle temporal gyrus of 83 brains (TCPY; HC: n = 40; AD: n = 43) and from the primary motor cortex of three brains (MCPY; HC: n = 3) were laser-captured and pooled for deep total RNA-seq. Human fibroblasts from four (FB) and peripheral blood mononuclear white cells from three individuals (PBMC) were analyzed as non-CNS cell types using the same pipeline. The RNAseq raw data is accessible via GEO accession number GSE218203. 
+As an extension of the [BRAINcode](http://www.humanbraincode.org) project, we studied the circRNAs in 197 human samples, including 190 human brain neuronal samples and 7 non-neuronal samples in this study. In detail, dopaminergic neurons (DA) from the midbrain substantia nigra pars compacta of 104 high-quality human brains (DA; HC: n = 59; ILB: n = 27; PD: n = 18), pyramidal neurons from layers V/VI of the middle temporal gyrus of 83 brains (TCPY; HC: n = 40; AD: n = 43) and from the primary motor cortex of three brains (MCPY; HC: n = 3) were laser-captured and pooled for deep total RNA-seq. Human fibroblasts from four (FB) and peripheral blood mononuclear white cells from three individuals (PBMC) were analyzed as non-CNS cell types using the same pipeline. The RNAseq raw data is accessible via GEO accession number GSE218203. 
 
 This is a code repository for circRNA analysis, including:
 
 ### 1. circRNA detection and annotation
 
-We ran circExplorer on all 197 BRAINcode RNAseq samples and 12 RM samples (treated with RNase-R and mock, by Dr. Yunfei Bai), and then merge together into a combined matrix.
+We ran circExplorer on all 197 BRAINcode RNA-seq samples and 12 RM samples (treated with RNase-R and mock, by Dr. Yunfei Bai), and then merge together into a combined matrix.
 
-**a. Ran circExplorer on each of the sample**
+#### a. Ran circExplorer on each of the sample
 
 circRNA calling is wrapped as part of our RNA-seq pipeline (see `RNAseq.pipeline.sh` in the [BRAINcode repository](https://github.com/sterding/BRAINcode)). For detail, please refer to the "*#STEP 4.1. mapping & calling circRNA*" in the [`_RNAseq.sh`](https://github.com/sterding/BRAINcode/blob/master/modules/_RNAseq.sh)
 
-- For RM samples: $HOME/neurogen/pipeline/RNAseq/RNAseq.pipeline.sh $PROJECT_PATH/rawfiles/RNAseq_RNaseR_Mock
-- For BC samples: $HOME/neurogen/pipeline/RNAseq/RNAseq.pipeline.sh $PROJECT_PATH/rawfiles
+- For RM samples: `$HOME/neurogen/pipeline/RNAseq/RNAseq.pipeline.sh $PROJECT_PATH/rawfiles/RNAseq_RNaseR_Mock`
+- For BC samples: `$HOME/neurogen/pipeline/RNAseq/RNAseq.pipeline.sh $PROJECT_PATH/rawfiles`
 
 Note that we made two modifications: 
 
@@ -26,7 +26,7 @@ Note that we made two modifications:
 2. switch to use GENCODE-based refFlat as annotation (see README.txt in `../Annotation/Genes/`) - 8/12/2019
 
 
-**b. Merge circRNA called from all samples**
+#### b. Merge circRNA called from all samples
 
 We merged CircExplorer output files "circularRNA_known3.txt" to count circRNAs for several samples in one table.  see script `./annotation/main.sh` for details
 
@@ -40,7 +40,7 @@ In the end, it will generate
 
 - Merge_circexplorer_BC_RM.annotation.bed14: circRNA annotation (in BED format) for all BRAINcode and RM samples.
 
-**c. circRNA filtering and normalization**
+#### c. circRNA filtering and normalization
 
 We then converted the circRNA read count table from long format to wide format (e.g. rows are circRNAs and columns are samples) and normalized circRNAs expression into RPM (reads per million). 
 
@@ -55,7 +55,7 @@ In the end, it will generate
 - Merge_circexplorer_BC197.filtered.enriched.normRPM.rds: Normalized expression matrix of filtered and enriched circRNAs in the BRAINcode samples (n=197 after QC).
 
 
-**e. make circRNA tracks for UCSC Genome Browser**
+#### e. Make circRNA tracks for UCSC Genome Browser
 
 See the "*#tracks for UCSC Genome Browser*" code trunk in the script `./annotation/main.sh` to generate trackDb.circRNA.txt file for all filtered and enriched circRNAs in the BRAINcode samples. 
 
