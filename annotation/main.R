@@ -9,6 +9,11 @@ setwd("~/projects/circRNA/data/")
 # Merge_circexplorer_BC221.annotation.bed14
 # Merge_circexplorer_BC221.rawcount.long.txt
 
+## sample size explaination
+# total sample size in BRAINcode2 = 221 (see Google spreadsheet and FigS1a)
+# after QC, outlier removal etc, n=197 (see FigS1a and Fig1b)
+# Among them, neuronal samples n=190, healthy control n=109, 
+
 ## see pilot.R in ~/Dropbox/grant/2019R21/pilot.R to make figure for pilot study (for grant purpose)
 
 ## Log
@@ -131,10 +136,22 @@ Merge_circexp_raw_filtered_and_enriched %>% select(contains("_SNDA_")) %>% trans
 Merge_circexp_raw_filtered_and_enriched %>% select(matches('_TCPY_|_MCPY_')) %>% transmute(ID=rownames(.), rowsums=rowSums(.)) %>% filter(rowsums > 0) %>% 
   left_join(y=annotation_filtered_enriched,by = "ID") %>% mutate(itemRgb=ifelse(circType=="circRNA",ifelse(strand=="+", "255,0,0", "0,0,255"), ifelse(strand=="+", "255,100,100", "100,100,255")), score = floor(1000*rowsums/max(rowsums))) %>% 
   select(chrom, start, end, ID, score, strand, thickStart,  thickEnd, itemRgb, exonCount, exonSizes, exonOffsets)%>% arrange(chrom, start, end) %>% write.table(file="ucsc_tracks/Merge_circexplorer_BC197.filtered.enriched.annotation.PY.bed12", row.names = F, col.names = F, quote = F, sep = "\t")
-Merge_circexp_raw_filtered_and_enriched %>% select(matches('_PBMY_|_FB_')) %>% transmute(ID=rownames(.), rowsums=rowSums(.)) %>% filter(rowsums > 0) %>% 
+Merge_circexp_raw_filtered_and_enriched %>% select(matches('_PBMC_|_FB_')) %>% transmute(ID=rownames(.), rowsums=rowSums(.)) %>% filter(rowsums > 0) %>% 
   left_join(y=annotation_filtered_enriched,by = "ID") %>% mutate(itemRgb=ifelse(circType=="circRNA",ifelse(strand=="+", "255,0,0", "0,0,255"), ifelse(strand=="+", "255,100,100", "100,100,255")), score = floor(1000*rowsums/max(rowsums))) %>% 
   select(chrom, start, end, ID, score, strand, thickStart,  thickEnd, itemRgb, exonCount, exonSizes, exonOffsets) %>% arrange(chrom, start, end) %>% write.table(file="ucsc_tracks/Merge_circexplorer_BC197.filtered.enriched.annotation.NN.bed12", row.names = F, col.names = F, quote = F, sep = "\t")
 
+# only the 109 HC
+Merge_circexp_raw_filtered_and_enriched %>% select(matches("HC_.*_SNDA_")) %>% transmute(ID=rownames(.), rowsums=rowSums(.)) %>% filter(rowsums > 0) %>% 
+  left_join(y=annotation_filtered_enriched,by = "ID") %>% mutate(itemRgb=ifelse(circType=="circRNA",ifelse(strand=="+", "255,0,0", "0,0,255"), ifelse(strand=="+", "255,100,100", "100,100,255")), score = floor(1000*rowsums/max(rowsums))) %>% 
+  select(chrom, start, end, ID, score, strand, thickStart,  thickEnd, itemRgb, exonCount, exonSizes, exonOffsets) %>% arrange(chrom, start, end) %>% write.table(file="ucsc_tracks/Merge_circexplorer_BC109.filtered.enriched.annotation.SNDA.bed12", row.names = F, col.names = F, quote = F, sep = "\t")
+Merge_circexp_raw_filtered_and_enriched %>% select(matches('HC_.*_[T,M]CPY_')) %>% transmute(ID=rownames(.), rowsums=rowSums(.)) %>% filter(rowsums > 0) %>% 
+  left_join(y=annotation_filtered_enriched,by = "ID") %>% mutate(itemRgb=ifelse(circType=="circRNA",ifelse(strand=="+", "255,0,0", "0,0,255"), ifelse(strand=="+", "255,100,100", "100,100,255")), score = floor(1000*rowsums/max(rowsums))) %>% 
+  select(chrom, start, end, ID, score, strand, thickStart,  thickEnd, itemRgb, exonCount, exonSizes, exonOffsets)%>% arrange(chrom, start, end) %>% write.table(file="ucsc_tracks/Merge_circexplorer_BC109.filtered.enriched.annotation.PY.bed12", row.names = F, col.names = F, quote = F, sep = "\t")
+Merge_circexp_raw_filtered_and_enriched %>% select(matches('HC_.*_PBMC_|HC_.*_FB_')) %>% transmute(ID=rownames(.), rowsums=rowSums(.)) %>% filter(rowsums > 0) %>% 
+  left_join(y=annotation_filtered_enriched,by = "ID") %>% mutate(itemRgb=ifelse(circType=="circRNA",ifelse(strand=="+", "255,0,0", "0,0,255"), ifelse(strand=="+", "255,100,100", "100,100,255")), score = floor(1000*rowsums/max(rowsums))) %>% 
+  select(chrom, start, end, ID, score, strand, thickStart,  thickEnd, itemRgb, exonCount, exonSizes, exonOffsets) %>% arrange(chrom, start, end) %>% write.table(file="ucsc_tracks/Merge_circexplorer_BC109.filtered.enriched.annotation.NN.bed12", row.names = F, col.names = F, quote = F, sep = "\t")
+
+## then go the ucsc_tracks/README.txt
 
 #########################################
 ## impute the dropout zero using scImpute 
@@ -209,24 +226,48 @@ annotation_filtered_enriched=readRDS(file="Merge_circexplorer_BC190.filtered.enr
 ## -------------------
 ### overlap with PD-GWAS genes, AD-GWAS genes, and SynGO genes
 ## -------------------
-ADgenes=unique(scan("~/neurogen/external_download/externalData/GWAS/AD_gwas_associatedGene.txt", character())); length(ADgenes)
-PDgenes=unique(system("grep -v Candidate ~/neurogen/external_download/externalData/GWAS/PD.GWAS.Chang2017.table1n2.xls | cut -f3 | sed 's/,/\\\n/g' | sort -u", intern = TRUE)); length(PDgenes)
-synGO=unique(readxl::read_xlsx("syngo_genes.xlsx")$ensembl_id); length(synGO)  # download from SynGO (https://www.syngoportal.org)
+ADgenes=unique(scan("~/neurogen/external_download/externalData/GWAS/AD/AD_gwas_associatedGene.txt", character())); length(ADgenes)
+#PDgenes=unique(system("grep -v Candidate ~/neurogen/external_download/externalData/GWAS/PD.GWAS.Chang2017.table1n2.xls | cut -f3 | sed 's/,/\\\n/g' | sort -u", intern = TRUE)); length(PDgenes)  # Chang et al. 2017
+PDgenes=unique(system("grep -v Nearest ~/neurogen/external_download/externalData/GWAS/PD/PD.GWAS.Nalls2019.TableS2.txt | cut -f4,5 | sed 's/\\\t$//;s/\\\t/\\\n/g' | sort -u", intern = TRUE)); length(PDgenes) # Nalls et al. 2019
+synGO=unique(readxl::read_xlsx("syngo_genes.xlsx")$ensembl_id); length(synGO)  # N=1112; download from SynGO (https://www.syngoportal.org)
+endocytosisGO=unique(read.delim("endocytosis.GO_0006897.Ensembl104.bioMart.tsv")$Gene.stable.ID); length(endocytosisGO)  # N=802; based on bioMart http://www.ensembl.org/biomart/martview/23b883ab8c5172aec6d515d3194108c6 
+#endocytosisGO=unique(read.delim("endocytosis.GO_0006897.Ensembl75.bioMart.tsv")$Ensembl.Gene.ID); length(endocytosisGO)  # N=400; based on bioMart http://feb2014.archive.ensembl.org/biomart/martview/de88da23301b459dc48f92592696c222
+## read the latest KEGG pathway (see note below)
+#endocytosisKEGG=read.delim("~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/KEGG/path2genes.tab") %>% filter(pathName=="Endocytosis") %>% pull(geneName) %>% unique(); length(endocytosisKEGG) # N=1082
+
 annotation=readRDS(file="Merge_circexplorer_BC190.annotation.bed14.rds")
 Merge_circexp_raw=readRDS("Merge_circexplorer_BC190.rawcount.rds")
 
 # top PD genes
-Merge_circexp_raw[as.character(annotation %>% filter(geneName %in% PDgenes) %>% pull(ID)),] %>% rownames_to_column() %>% mutate(rowsum=rowSums(select(.,contains("_")))) %>% select(rowsum, ID=rowname) %>% left_join(y=annotation, by="ID") %>% arrange(-rowsum) %>% top_n(20)
+Merge_circexp_raw[as.character(annotation %>% filter(geneName %in% PDgenes) %>% pull(ID)),] %>% rownames_to_column() %>% mutate(rowsum=rowSums(select(.,contains("_")))) %>% select(rowsum, ID=rowname) %>% left_join(y=annotation, by="ID") %>% slice_max(rowsum, n = 20)
 # top AD genes
-Merge_circexp_raw[as.character(annotation %>% filter(geneName %in% ADgenes) %>% pull(ID)),] %>% rownames_to_column() %>% mutate(rowsum=rowSums(select(.,contains("_")))) %>% select(rowsum, ID=rowname) %>% left_join(y=annotation, by="ID") %>% arrange(-rowsum) %>% top_n(20) 
+Merge_circexp_raw[as.character(annotation %>% filter(geneName %in% ADgenes) %>% pull(ID)),] %>% rownames_to_column() %>% mutate(rowsum=rowSums(select(.,contains("_")))) %>% select(rowsum, ID=rowname) %>% left_join(y=annotation, by="ID") %>% slice_max(rowsum, n = 20) 
 # top synGO genes
-Merge_circexp_raw[as.character(annotation %>% mutate(geneID=gsub("\\..*","", geneID)) %>% filter(geneID %in% synGO) %>% pull(ID)),] %>% rownames_to_column() %>% mutate(rowsum=rowSums(select(.,contains("_")))) %>% select(rowsum, ID=rowname) %>% left_join(y=annotation, by="ID") %>% arrange(-rowsum) %>% top_n(20)
+Merge_circexp_raw[as.character(annotation %>% mutate(geneID=gsub("\\..*","", geneID)) %>% filter(geneID %in% synGO) %>% pull(ID)),] %>% rownames_to_column() %>% mutate(rowsum=rowSums(select(.,contains("_")))) %>% select(rowsum, ID=rowname) %>% left_join(y=annotation, by="ID") %>% slice_max(rowsum, n = 20) 
+# top EndocytosisGO genes
+Merge_circexp_raw[as.character(annotation %>% mutate(geneID=gsub("\\..*","", geneID)) %>% filter(geneID %in% endocytosisGO) %>% pull(ID)),] %>% rownames_to_column() %>% mutate(rowsum=rowSums(select(.,contains("_")))) %>% select(rowsum, ID=rowname) %>% left_join(y=select(annotation,ID, strand,exonCount,circType,geneID, geneName, geneType), by="ID") %>% slice_max(rowsum, n = 20)
+# top endocytosisKEGG genes
+Merge_circexp_raw[as.character(annotation %>% filter(geneName %in% endocytosisKEGG) %>% pull(ID)),] %>% rownames_to_column() %>% mutate(rowsum=rowSums(select(.,contains("_")))) %>% select(rowsum, ID=rowname) %>% left_join(y=annotation, by="ID") %>% slice_max(rowsum, n = 20) 
 
-pdf("~/projects/circRNA/results/Merge_circexplorer_BC190.annotation.ADPDsynGO.pie.pdf", width=4, height = 12)
-par(mfrow=c(3,1))
+# joint
+rownames_to_column(Merge_circexp_raw) %>% mutate(rowsum=rowSums(select(.,contains("_")))) %>% select(rowsum, ID=rowname) %>% 
+  left_join(y=select(annotation,ID, strand,exonCount,circType,geneID, geneName, geneType), by="ID") %>% 
+  mutate(geneID=gsub("\\..*","", geneID)) %>%
+  mutate(is.ADgene=geneName %in% ADgenes,
+         is.PDgene=geneName %in% PDgenes,
+         is.synGO =geneID %in% synGO,
+         is.Endocy=geneID %in% endocytosisGO) %>%
+  filter(is.PDgene, is.ADgene | is.synGO | is.Endocy) %>% 
+  #filter(geneName=="NRXN3")
+  slice_max(rowsum, n = 50) 
+
+
+pdf("~/projects/circRNA/results/Merge_circexplorer_BC190.annotation.ADPDsynGOendoGO.pie.pdf", width=4, height = 4)
 pie(table(PDgenes %in% annotation$geneName),labels = c(NA,paste0(table(PDgenes %in% annotation$geneName)[2],"/",sum(table(PDgenes %in% annotation$geneName)),"\n(",round(100*mean(PDgenes %in% annotation$geneName),2),"%)")), border='gray', col=c('white','gray'),main="PD-risk genes producing circRNAs")
 pie(table(ADgenes %in% annotation$geneName),labels = c(NA,paste0(table(ADgenes %in% annotation$geneName)[2],"/",sum(table(ADgenes %in% annotation$geneName)),"\n(",round(100*mean(ADgenes %in% annotation$geneName),2),"%)")), border='gray', col=c('white','gray'),main="AD-risk genes producing circRNAs")
 pie(table(synGO %in% gsub("\\..*","", annotation$geneID)),labels = c(NA,paste0(table(synGO %in% gsub("\\..*","", annotation$geneID))[2],"/",sum(table(synGO %in% gsub("\\..*","", annotation$geneID))),"\n(",round(100*mean(synGO %in% gsub("\\..*","", annotation$geneID)),2),"%)")), border='gray', col=c('white','gray'),main="Synaptic genes producing circRNAs")
+pie(table(endocytosisGO %in% gsub("\\..*","", annotation$geneID)),labels = c(NA,paste0(table(endocytosisGO %in% gsub("\\..*","", annotation$geneID))[2],"/",sum(table(endocytosisGO %in% gsub("\\..*","", annotation$geneID))),"\n(",round(100*mean(endocytosisGO %in% gsub("\\..*","", annotation$geneID)),2),"%)")), border='gray', col=c('white','gray'),main="Endocytosis(GO) genes producing circRNAs")
+#pie(table(endocytosisKEGG %in% annotation$geneName),labels = c(NA,paste0(table(endocytosisKEGG %in% annotation$geneName)[2],"/",sum(table(endocytosisKEGG %in% annotation$geneName)),"\n(",round(100*mean(endocytosisKEGG %in% annotation$geneName),2),"%)")), border='gray', col=c('white','gray'),main="Endocytosis(KEGG) genes producing circRNAs")
 dev.off()
 
 # Fisher's exact test
@@ -259,10 +300,10 @@ as.data.frame(percentage_of_synGOgene_among_all_hostgenes) %>% rownames_to_colum
 # PD >>
 # all cirsRNAs
 table(PDgenes %in% annotation$geneName)
-# 59/72
+# 96/109
 # DA neuronal circRNAs
 table(PDgenes %in% (annotation %>% filter(ID %in% (Merge_circexp_raw %>% select(contains("_SNDA_")) %>% rownames_to_column() %>% filter_at(vars(-rowname), any_vars(. != 0)) %>% pull(rowname))) %>% pull(geneName)))
-# 57/72  
+# 86/109  
 
 # AD >>
 # all cirsRNAs
@@ -273,11 +314,85 @@ table(ADgenes %in% (annotation %>% filter(ID %in% (Merge_circexp_raw %>% select(
 # 131/217  
 
 ## -------------------
+### overlap with endocytosis genes etc. - related with new Fig3
+## see comment from Clemens below:
+# -	Try one alternative ways to visualize this in a more attractive manner. For example, we could show 4 pie graphs; each representing the totality of circRNAs. Then show the % of circRNAs in select key pathways 
+# - A (eg endocytosis-related: endocytosis, axon guidance, adherence junction (check and correcct spelling in figure), long-term potentiation, long term depression => all related to endo/syn) as slices in the pies. 
+# - B. pathways in cancers (eg pathways in cancer, thryodi cancer, prostate cncer,endometrial cncer etc)as another slice (…enriched in NN).
+# -	C. Tight junction, gap junction
+# -	D. Erb signalling
+# -	E. Other sig pathways
+## -------------------
+
+# read "gene - pathway" relationship from MSigDB
+library('fgsea')
+genesets_list = fgsea::gmtPathways("~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/msigdb_v7.2/msigdb_v7.2_GMTs/c2.cp.kegg.v7.2.symbols.gmt")
+# genesets is a list, convert to a data frame
+library(tidyverse)
+genesets_df = data.frame(pathwayID=rep(names(genesets_list), lengths(genesets_list)), geneName=unlist(genesets_list, use.names = F))
+# add pathway to circRNA annotation list
+annotation_filtered_enriched=readRDS(file="Merge_circexplorer_BC190.filtered.enriched.annotation.bed14.rds"); dim(annotation_filtered_enriched)
+annotation_filtered_enriched %>% left_join(y=genesets_df, by="geneName") %>% filter(!is.na(pathwayID)) %>% pull(ID) %>% unique() %>% length() ## only 2689 (out of 11039) circRNAs with host genes in KEGG pathway somehow (either due to the incomplete of KEGG or the gene name convertion)
+
+# read the "gene - pathway" relationship from the latest KEGG download
+kegg.enrichment <- function(circRNAset, output_filename="../results/circRNAs.hostgenes.kegg.enrichment.pie.pdf", path2genes="~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/KEGG/path2genes.tab"){
+  # debug: circRNAset=annotation_filtered_enriched; output_filename="../results/Merge_circexplorer_BC190.filtered.enriched.annotation.hostgenes.kegg.enrichment.pie.pdf"; path2genes="~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/KEGG/path2genes.tab"
+  # get KEGG path to gene relationship
+  if(file.exists(path2genes)) path2genes = read.delim(path2genes, header = T) else {
+    g=read.delim("~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/KEGG/kegg.genes.list", sep = "\t", header = F, col.names = c("geneID", "geneNames","geneDesp"))
+    p2g=read.delim("~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/KEGG/pathway.genes.list", sep = "\t", header = F, col.names = c("pathID","geneID"))
+    p=read.delim("~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/KEGG/pathway.genes.tab", sep = "\t", header = F, col.names = c("pathID","pathName","geneNames"))
+    path2genes = left_join(p2g,g,by="geneID") %>% group_by(pathID) %>% mutate(geneName = paste0(geneNames, collapse = ", ")) %>% select(pathID, geneName) %>% # tail()
+      separate_rows(geneName, sep=", ") %>% mutate(pathID=sub("path:","",pathID)) %>% left_join(select(p,pathID, pathName), by="pathID") %>% distinct()    
+    write.table(path2genes, file = "~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/KEGG/path2genes.tab", col.names = T, row.names = F, quote = F, sep = "\t")
+  }
+  head(path2genes)
+  
+  # annotation_filtered_enriched %>% left_join(y=path2genes, by="geneName") %>% filter(!is.na(pathID)) %>% pull(ID) %>% unique() %>% length() ## still, only 4318 (out of 11039) circRNAs with host genes found in KEGG pathway somehow (either due to the incomplete of KEGG or the gene name convertion)
+  ## it seems that KEGG is not a good choice as it only covers a small subset of genes (total 5245 genes in mSigDbv7.2 KEGG set)
+  ## we still use KEGG as temporary solution, but in long term, we might need to switch to GO 
+  
+  x=circRNAset %>% left_join(y=path2genes, by="geneName") %>% filter(!is.na(pathID)) %>% 
+    mutate(group = ifelse(pathName %in%c("Endocytosis", "Axon guidance", "Adherens junction", "Long-term potentiation", "Long-term depression") | grepl("synapse", ignore.case =T, pathName), "A_endocytosis", 
+                          ifelse(grepl("cancer",ignore.case =T, pathName), "B_cancer", 
+                                 ifelse(grepl("junction",ignore.case =T, pathName), "C_junction", 
+                                        ifelse(pathName %in%c("ErbB signaling pathway"), "D_Erbb", "E_others")))))
+  ## prioritize in order of A->E
+  df = select(x, ID, group) %>% distinct() %>% mutate(value=1) %>% pivot_wider(id_cols = ID, names_from=group, values_from=value)
+  A=filter(df, A_endocytosis==1)
+  B=filter(df, is.na(A_endocytosis)) %>% filter(B_cancer==1)
+  C=filter(df, is.na(A_endocytosis), is.na(B_cancer)) %>% filter(C_junction==1)
+  D=filter(df, is.na(A_endocytosis), is.na(B_cancer), is.na(C_junction)) %>% filter(D_Erbb==1)
+  E=filter(df, is.na(A_endocytosis), is.na(B_cancer), is.na(C_junction), is.na(D_Erbb)) %>% filter(E_others==1)
+  df=rbind(data.frame(ID=A$ID, group="A_endocytosis"),
+          data.frame(ID=B$ID, group="B_cancer"),
+          data.frame(ID=C$ID, group="C_junction"),
+          data.frame(ID=D$ID, group="D_Erbb"),
+          data.frame(ID=E$ID, group="E_others"))
+  
+  pdf(output_filename, width = 5, height = 5)
+  par(mar=c(4,4,4,4))
+  pie(table(df$group),radius = 1, cex = 0.4, labels = paste0(names(table(df$group))," (",round(100*table(df$group)/sum(table(df$group)),2),"%, ", table(df$group), "/", sum(table(df$group)),")"))
+  par(mar=c(5,15,3,3))
+  barplot(sort(table(x$pathName)), xlim=c(100,800),horiz = T, las=2, cex.names = 0.2)
+  dev.off()
+}
+
+kegg.enrichment(annotation_filtered_enriched, output_filename="../results/Merge_circexplorer_BC190.filtered.enriched.annotation.hostgenes.kegg.enrichment.pie.pdf")
+## go to cell-specific circRNAs
+DF3=readRDS("Merge_circexplorer_BC109.cellspecific_heatmap.circRNA3.rds") ## see getTissueSpecificRNA.R
+for(i in c("NN","PY","SNDA")) {
+  message(paste("processing cell type",i,"..."));
+  kegg.enrichment(annotation_filtered_enriched[as.character(annotation_filtered_enriched$ID) %in% unique(subset(DF3, celltype==i, select = 'gene',drop = T)),], output_filename=paste0("../results/Merge_circexplorer_BC109.cellspecific_heatmap5.genes3.",i,".kegg.enrichment.pie.pdf"))
+}
+
+## -------------------
 ## conserved to Drosophila
 ## -------------------
 library('biomaRt') # BiocManager::install('biomaRt',ask=F); 
-gmart = useEnsembl(biomart = "ensembl", dataset = "hsapiens_gene_ensembl") # Ensembl v75 is GRCh37.p13, which is same as GENCODE v19
-listAttributes(gmart, page='homologs'); listFilters(gmart);
+gmart = useEnsembl(biomart = "ensembl",version=75, dataset = "hsapiens_gene_ensembl") # Ensembl v75 is GRCh37.p13, which is same as GENCODE v19
+listAttributes(gmart, page='homologs') %>% filter(grepl("dmelanogaster", name));
+listFilters(gmart);
 attributes = c("ensembl_gene_id",
                "dmelanogaster_homolog_ensembl_gene","dmelanogaster_homolog_associated_gene_name",
                "dmelanogaster_homolog_orthology_type",
@@ -302,6 +417,7 @@ x0= rbind(circRNA_hostgene = circRNA_fly_orth, all_genes=c(total_human_genes-tot
 x=x0/rowSums(x0)
 
 # those fly genes with circRNAs
+# options(timeout=200); download.file("https://www.picb.ac.cn/rnomics/circpedia/static/download_cache/fly_dm6_All_circRNA.csv", destfile = "circpedia.fly_dm6_All_circRNA.csv")
 CIRCpedia2_fly = read.csv("https://www.picb.ac.cn/rnomics/circpedia/static/download_cache/fly_dm6_All_circRNA.csv", header = F)
 dim(CIRCpedia2_fly); head(CIRCpedia2_fly)
 
@@ -703,16 +819,31 @@ genes_expressed_symbol=subset(genes_annotation, EnsID %in% rownames(genes_expres
 length(genes_expressed_symbol)
 
 source("~/neurogen/pipeline/RNAseq/bin/lib.R")
-# using the expressed genes as background
-ORA(inputGenes=unique(annotation_filtered_enriched$geneName), allGenes=genes_expressed_symbol, topN=10, output="Merge_circexplorer_BC190.filtered.enriched.circRNA.expressedinNeuron")
-topGOenrichment(unique(annotation_filtered_enriched$geneName), allGenes=genes_expressed_symbol, topN=10, pCutoff=0.01, type='all', output="Merge_circexplorer_BC190.filtered.enriched.circRNA.expressedinNeuron")
+# # using the expressed genes as background
+# ORA(inputGenes=unique(annotation_filtered_enriched$geneName), allGenes=genes_expressed_symbol, topN=10, output="Merge_circexplorer_BC190.filtered.enriched.circRNA.expressedinNeuron")
+# topGOenrichment(unique(annotation_filtered_enriched$geneName), allGenes=genes_expressed_symbol, topN=10, pCutoff=0.01, type='all', output="Merge_circexplorer_BC190.filtered.enriched.circRNA.expressedinNeuron")
 
 # using all genes as background  ## used in the final version
-ORA(inputGenes=unique(annotation_filtered_enriched$geneName), allGenes=genes_annotation$symbol, topN=10, output="Merge_circexplorer_BC190.filtered.enriched.circRNA.all")
+res=ORA(inputGenes=unique(annotation_filtered_enriched$geneName), allGenes=genes_annotation$symbol, topN=10, output="../results/Merge_circexplorer_BC190.filtered.enriched.circRNA.all")
+res2=ORA_slim(res)
 
+# Q: how many (N and %)  circRNAs annotated to KEGG endosytocis genes?
+table(annotation_filtered_enriched$geneName %in% strsplit(res$genelist[res$V1=="KEGG_ENDOCYTOSIS"], ",")[[1]])
+# FALSE  TRUE 
+# 10822   217 
+
+# Q: how many (N and %)  circRNAs annotated to synaptic vesicle endocytosis? (XD use both GO synapse definition here and secondly the ad hoc synapse gene set also used in Fig 3a)
+# table(annotation_filtered_enriched$geneName %in% strsplit(filter(res, gene_set=='c5.go.cc', V1=='GO_SYNAPSE') %>% pull(genelist), split = ",")[[1]]) # synapse genes
+# # FALSE  TRUE 
+# # 9512  1527 
+# ora0=read.table("../results/Merge_circexplorer_BC190.filtered.enriched.circRNA.all.ORA.all.xls", sep = "\t", header = T, row.names = 1)
+# filter(ora0, gene_set=='c5.go.bp', V1=='GO_SYNAPTIC_VESICLE_ENDOCYTOSIS') ## Note that GO_SYNAPTIC_VESICLE_ENDOCYTOSIS is not included in the MySigDB v7.2. We changed to check v7.4
+genelists=strsplit(system("grep GOBP_SYNAPTIC_VESICLE_EXOCYTOSIS ~/bioinformatics/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/msigdb_v7.4/msigdb_v7.4_GMTs/c5.go.bp.v7.4.symbols.gmt | cut -f3-", intern =T), split = "\t")[[1]]
+mean(annotation_filtered_enriched$geneName %in% genelists)
+# 0.01684935
 
 ## ===============================================
-## add GDA (gene-disease assocaition) from DisGeNet (http://www.disgenet.org/)
+## Fig. 1f: add GDA (gene-disease assocaition) from DisGeNet (http://www.disgenet.org/)
 ## ===============================================
 # library(disgenet2r) # library(devtools); install_bitbucket("ibi_group/disgenet2r")
 # genes2diseases <- function(genes=genes) {
@@ -722,25 +853,76 @@ ORA(inputGenes=unique(annotation_filtered_enriched$geneName), allGenes=genes_ann
 # big.list.of.data.frames <- lapply(split(glist, ceiling(seq_along(glist)/100)), genes2diseases)
 # big.data.frame <- do.call(rbind,big.list.of.data.frames)
 
+# circRNA host genes
+annotation_filtered_enriched=readRDS(file="Merge_circexplorer_BC190.filtered.enriched.annotation.bed14.rds")
+glist = unique(annotation_filtered_enriched$geneName)
+
 # enrichment
-disgenet_CURATED = read.table(gzcon(url("http://www.disgenet.org/static/disgenet_ap1/files/downloads/curated_gene_disease_associations.tsv.gz"),text=T), sep="\t", quote = "", header = T, stringsAsFactors = F)
-saveRDS(disgenet_CURATED,file = "~/neurogen/external_download/externalData/others/DisGeNET.curated_gene_disease_associations.RDS")
+#disgenet_CURATED = read.table(gzcon(url("http://www.disgenet.org/static/disgenet_ap1/files/downloads/curated_gene_disease_associations.tsv.gz"),text=T), sep="\t", quote = "", header = T, stringsAsFactors = F)
+#saveRDS(disgenet_CURATED,file = "~/neurogen/external_download/externalData/others/DisGeNET.curated_gene_disease_associations.RDS")
+disgenet_CURATED = readRDS(file = "~/neurogen/external_download/externalData/others/DisGeNET.curated_gene_disease_associations.RDS")
 colnames(disgenet_CURATED); head(disgenet_CURATED)
-disgenet_disease = read.table(gzcon(url("https://www.disgenet.org/static/disgenet_ap1/files/downloads/disease_mappings_to_attributes.tsv.gz"),text=T), sep="\t", quote = "", header = T, stringsAsFactors = F)
-saveRDS(disgenet_disease,file = "~/neurogen/external_download/externalData/others/DisGeNET.disease_mapping_to_attributes.RDS")
-colnames(disgenet_disease)
-head(disgenet_disease)
+# disgenet_disease = read.table(gzcon(url("https://www.disgenet.org/static/disgenet_ap1/files/downloads/disease_mappings_to_attributes.tsv.gz"),text=T), sep="\t", quote = "", header = T, stringsAsFactors = F)
+# saveRDS(disgenet_disease,file = "~/neurogen/external_download/externalData/others/DisGeNET.disease_mapping_to_attributes.RDS")
+disgenet_disease = readRDS(file = "~/neurogen/external_download/externalData/others/DisGeNET.disease_mapping_to_attributes.RDS")
+colnames(disgenet_disease); head(disgenet_disease)
 
 source("../src/annotation/tools.R")  # rewrite some of DisGeNET functions
 gsd=disgenet_CURATED %>% select(geneId, geneSymbol, diseaseId, diseaseName) %>% distinct()
 dim(gsd); str(gsd)
 res_enrich = disease_enrichment_v2(genes = glist, gdas = gsd)
-filter(res_enrich, Count>3, FDR<0.01) %>% select("ID","Description", "pvalue", "FDR", "GeneRatio",  "BgRatio","OR")
+write.table(cbind(celltype='all', res_enrich), paste0("../results/Merge_circexplorer_BC190.filtered.enriched.circRNA.expressedinNeuron.DisGeNet.ALL.xls"),sep="\t", na="", row.names=F) 
+select(res_enrich, "ID","Description", "pvalue", "FDR", "GeneRatio",  "BgRatio","OR", "Count") %>% filter(Count>3, FDR<0.01)
+select(res_enrich, "ID","Description", "pvalue", "FDR", "GeneRatio",  "BgRatio","OR", "Count") %>% filter(grepl("Parkinson|Alzheimer", Description))
 pdf("../results/Merge_circexplorer_BC190.filtered.enriched.circRNA.expressedinNeuron.DisGeNet.pdf", width = 7, height = 7); 
-plot_enrichment(res_enrich, cutoff = 0.01, count = 3, limit = 20); 
+plot_enrichment(select(res_enrich, "Description", "Count", "FDR", "OR"), cutoff = 0.01, count = 3, limit = 200); 
 dev.off()
 
-gsd2=disgenet_CURATED %>% select(geneId, geneSymbol, diseaseId=diseaseClass) %>% distinct() %>% inner_join(y=select(disgenet_disease, diseaseId=diseaseClassMSH, diseaseName=diseaseClassNameMSH) %>% distinct(), by="diseaseId")
+## add PD/AD gwas genes
+ADgenes=unique(scan("~/neurogen/external_download/externalData/GWAS/AD/AD_gwas_associatedGene.txt", character())); length(ADgenes)
+#PDgenes=unique(system("grep -v Candidate ~/neurogen/external_download/externalData/GWAS/PD.GWAS.Chang2017.table1n2.xls | cut -f3 | sed 's/,/\\\n/g' | sort -u", intern = TRUE)); length(PDgenes) # Chang et al. 2017
+PDgenes=unique(system("grep -v Nearest ~/neurogen/external_download/externalData/GWAS/PD/PD.GWAS.Nalls2019.TableS2.txt | cut -f4,5 | sed 's/\\\t$//;s/\\\t/\\\n/g' | sort -u", intern = TRUE)); length(PDgenes) # Nalls et al. 2019
+annotation=readRDS(file="Merge_circexplorer_BC190.annotation.bed14.rds")
+GENCODEv19=read.table("~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/Genes/gencode.v19.annotation.genes.bed", 
+                      col.names = c("chr","start","end","geneName","geneID","geneType","strand"), stringsAsFactors = F, header = F)
+
+gwas_list = list(AD_risk_genes=ADgenes, PD_risk_genes=PDgenes)
+genes=unique(annotation$geneName)
+universe=unique(GENCODEv19$geneName)
+
+data <- data.frame(ID = character(), Description = character(), 
+                   GeneRatio = character(), BgRatio = character(), OR=numeric(), geneID = character(), 
+                   pvalue = numeric(), Count = integer(), stringsAsFactors = FALSE)
+for(i in 1:length(gwas_list)){
+  aa <- gwas_list[[i]]
+  inter <- length(intersect(aa, genes))
+  t <- matrix(c(inter, length(aa) - inter, length(genes) - 
+                  inter, length(universe) + inter - length(aa) - length(genes)), 
+              nrow = 2, dimnames = list(module = c("in", "out"), 
+                                        Pheno = c("phen", "nophen")))
+  test <- fisher.test(t, alternative = "greater")
+  pv <- test$p.value
+  OR <- as.numeric(test$estimate) ## Odds ratio
+  GeneRatio <- paste(inter, "/", length(genes), sep = "")
+  BgRatio <- paste(length(aa), "/", length(universe), sep = "")
+  geneID <- paste(intersect(aa, genes), collapse = "/") ## can be changed to geneSymbol 
+  data[i, ] <- c(as.character(names(gwas_list)[i]), as.character(names(gwas_list)[i]), GeneRatio, BgRatio, OR, geneID, pv, inter)
+}
+data$pvalue <- as.numeric(data$pvalue)
+data$FDR <- p.adjust(data$pvalue, method = "BH")
+data$Count <- as.numeric(as.character(data$Count))
+data$gg <- data$Count/length(genes)
+data$OR <- as.numeric(data$OR)
+data <- data[order(as.numeric(as.character(data$FDR))), ]
+
+write.table(cbind(celltype='all', rbind(res_enrich, data)), paste0("../results/Merge_circexplorer_BC190.filtered.enriched.circRNA.expressedinNeuron.DisGeNet+gwas.ALL.xls"),sep="\t", na="", row.names=F) 
+
+pdf("../results/Merge_circexplorer_BC190.filtered.enriched.circRNA.expressedinNeuron.DisGeNet+gwas.pdf", width = 8, height = 7); 
+rbind(res_enrich, data) %>% select("Description", "Count", "FDR", "OR") %>% plot_enrichment(cutoff = 0.01, count = 3, title="", limit = 200); 
+dev.off()
+
+gsd2=disgenet_CURATED %>% select(geneId, geneSymbol, diseaseId=diseaseClass) %>% distinct() %>% 
+  inner_join(y=select(disgenet_disease, diseaseId=diseaseClassMSH, diseaseName=diseaseClassNameMSH) %>% distinct(), by="diseaseId")
 dim(gsd2); str(gsd2)
 res_enrich = disease_enrichment_v2(genes = glist, gdas = gsd2)
 filter(res_enrich, Count>3, FDR<0.01) %>% select("ID","Description", "pvalue", "FDR", "GeneRatio",  "BgRatio","OR")
@@ -748,7 +930,10 @@ plot_enrichment(res_enrich, cutoff = 0.01, count = 3, limit = 10)
 
 gsd3=disgenet_CURATED %>% select(geneId, geneSymbol, diseaseId=diseaseClass) %>% distinct() %>% 
   mutate(diseaseId = strsplit(diseaseId, ";")) %>% unnest(diseaseId) %>% distinct() %>% 
-  inner_join(y=select(disgenet_disease, diseaseId=diseaseClassMSH, diseaseName=diseaseClassNameMSH) %>% mutate(diseaseId = strsplit(diseaseId, ";"), diseaseName = strsplit(diseaseName, "; ")) %>% unnest(c(diseaseId, diseaseName)) %>% distinct(), by="diseaseId")
+  inner_join(y=select(disgenet_disease, diseaseId=diseaseClassMSH, diseaseName=diseaseClassNameMSH) %>% 
+               mutate(diseaseId = strsplit(diseaseId, ";"), diseaseName = strsplit(diseaseName, "; ")) %>% 
+               unnest(c(diseaseId, diseaseName)) %>% distinct(), 
+             by="diseaseId")
 dim(gsd3); head(gsd3)
 res_enrich = disease_enrichment_v2(genes = glist, gdas = gsd3) 
 filter(res_enrich, Count>=3, FDR<=0.05) %>% select("ID","Description", "pvalue", "FDR", "GeneRatio",  "BgRatio","OR")
@@ -757,9 +942,35 @@ plot_enrichment(res_enrich, cutoff = 0.01, count = 3, limit = 20);
 dev.off()
 
 
+## how many ILB-DE circRNAs are from synGO genes?
+de=read.table("../results/DE2gene_SNDA/DEresult.DE2gene_SNDA.CONDITION_ILB_vs_HC.xls.gz", sep="\t", header = T, row.names = 1)
+head(de)
+synGO=unique(readxl::read_xlsx("syngo_genes.xlsx")$hgnc_symbol); length(synGO)  # N=1112; download from SynGO (https://www.syngoportal.org)
+filter(de[,1:12], pvalue<0.05, abs(log2FoldChange)>1, geneName %in% synGO)
 
 
+## 99% of the AD-associated GWAS SNPs26 (2334/2357) and XX% (…) of the PD-associated GWAS SNPs were located in the proximity (i.e. within 1M bp) of a circRNA (data not shown)
+# bash
+# zcat ~/neurogen/external_download/externalData/GWAS/AD/AD_sumstats_Jansenetal.txt.gz | awk 'NR>1 && $8<5e-8{OFS="\t"; print "chr"$2, ($3<1000000)?0:($3-1000000), $3+1000000}' | intersectBed -a - -b ~/projects/circRNA/data/Merge_circexplorer_BC197.filtered.enriched.annotation.bed14 -u | wc -l
+# cat ~/neurogen/external_download/externalData/GWAS/PD/nallsEtAl2019_allSamples_significantVariants5E-8.hg19.bed6 | awk '{OFS="\t"; print $1, ($3<1000000)?0:($3-1000000), $3+1000000}' | intersectBed -a - -b ~/projects/circRNA/data/Merge_circexplorer_BC197.filtered.enriched.annotation.bed14 -u | wc -l
 
+## Q: XX% of all synaptic circRNAs were linked to brain diseases
+annotation_filtered_enriched=readRDS(file="Merge_circexplorer_BC190.filtered.enriched.annotation.bed14.rds"); dim(annotation_filtered_enriched)
+synGO=unique(readxl::read_xlsx("syngo_genes.xlsx")$hgnc_symbol); length(synGO)  # N=1112; download from SynGO (https://www.syngoportal.org)
+disgenet_CURATED = readRDS(file = "~/neurogen/external_download/externalData/others/DisGeNET.curated_gene_disease_associations.RDS")
+colnames(disgenet_CURATED); head(disgenet_CURATED)
+disgenet_disease = readRDS(file = "~/neurogen/external_download/externalData/others/DisGeNET.disease_mapping_to_attributes.RDS")
+gsd3=disgenet_CURATED %>% select(geneId, geneSymbol, diseaseId=diseaseClass) %>% distinct() %>% 
+  mutate(diseaseId = strsplit(diseaseId, ";")) %>% unnest(diseaseId) %>% distinct() %>% 
+  inner_join(y=select(disgenet_disease, diseaseId=diseaseClassMSH, diseaseName=diseaseClassNameMSH) %>% 
+               mutate(diseaseId = strsplit(diseaseId, ";"), diseaseName = strsplit(diseaseName, "; ")) %>% 
+               unnest(c(diseaseId, diseaseName)) %>% distinct(), 
+             by="diseaseId")
+dim(gsd3); head(gsd3)
+filter(annotation_filtered_enriched, geneName %in% synGO) %>% dim() # 1362
+filter(annotation_filtered_enriched, geneName %in% synGO, geneName %in% unique(filter(gsd3, diseaseName %in% c("Mental Disorders", "Nervous System Diseases")) %>% pull(geneSymbol))) %>% dim() # 837
+837/1362
+# 0.6145374
 
 ## ===============================================
 ## expression of linear RNA vs. circRNA
@@ -832,8 +1043,9 @@ ggsave("../results/Merge_circexplorer_BC106.annotation.bed14.nC.vs.nL.boxplot.pd
 
 # nC vs. nL scatter plot
 set.seed(1)
+library(scales)
 ggplot(nCL,aes(x = jitter(nL, amount=0.49), y = jitter(nC, amount=.49))) +
-  geom_point(aes(colour = factor(celltype, levels = c("SNDA","TCPY","MCPY","FB","PBMC"))), shape=19, size=.8, alpha=0.8) +
+  geom_point(aes(colour = factor(celltype, levels = c("SNDA","TCPY","MCPY","FB","PBMC"))), shape=16, alpha=0.8) +
   geom_abline(intercept = 0, slope = 1, linetype=2) +
   scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
                 labels = trans_format("log10", math_format(10^.x))) +

@@ -66,6 +66,10 @@ gene_type = opt$gene_type
 # setwd("~/projects/circRNA/results/"); input_expression_filename="../data/Merge_circexplorer_Bennett_VMB.filtered.rawcount.rds"; input_covariance_filename="Table.Bennett.PD.VMP.pathology.covariates.xls"; output_additonal_columns='Mmi'; output_dir="DE2gene_VMB"; index="hg19"; comparison="CONDITION:PD:HC"; annotation_path='~/projects/circRNA/data/Merge_circexplorer_Bennett_VMB.filtered.annotation.bed14.rds'; COLLAPSE=TRUE; gene_type='circRNA'
 
 # setwd("~/neurogen/rnaseq_PD/results/"); input_expression_filename="merged/genes.count.cuffnorm.allSamples.BCv2.uniq.xls"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls"; output_additonal_columns='Mmi'; output_dir="DE_SNDA.gene"; index="hg19"; comparison="CONDITION2:PD:HC"; gene_type='gene'
+# setwd("~/neurogen/rnaseq_PD/results/"); input_expression_filename="merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls"; input_covariance_filename="Table.AD.TCPY.pathology.covariates.xls"; output_additonal_columns='Mmi'; output_dir="DE_TCPY.gene"; index="hg19"; comparison="CONDITION:AD:HC"; gene_type='gene'
+# setwd("~/neurogen/rnaseq_PD/results/"); input_expression_filename="merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls"; output_additonal_columns='Mmi'; scMode=F; output_dir="DE_SNDA.gene"; index="hg19"; comparison="CONDITION2:PD:HC"; gene_type='gene'; file_of_gene_list="ERC1.DNAJC6.DYM.txt"
+# setwd("~/neurogen/rnaseq_PD/results/"); input_expression_filename="merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls"; input_covariance_filename="Table.PD.SNDA.pathology.covariates.xls"; output_additonal_columns='Mmi'; scMode=F; output_dir="DE_SNDA.gene"; index="hg19"; comparison="CONDITION:ILB:HC"; gene_type='gene'; file_of_gene_list="ERC1.DNAJC6.DYM.txt"
+
 
 if(is.null(comparison)){
   print_help(opt_parser)
@@ -97,14 +101,14 @@ setwd(output_dir)
 set.seed(42)
 
 # install packages
-suppressPackageStartupMessages(library('tidyverse',logical.return=T) || install.packages('tidyverse', repo='http://cran.revolutionanalytics.com'))
-suppressPackageStartupMessages(library('RCurl',logical.return=T) || install.packages('RCurl', repo='http://cran.revolutionanalytics.com'))
-suppressPackageStartupMessages(library('hexbin',logical.return=T) || install.packages('hexbin', repo='http://cran.revolutionanalytics.com'))
-suppressPackageStartupMessages(library('pheatmap',logical.return=T) || install.packages('pheatmap', repo='http://cran.revolutionanalytics.com'))
-suppressPackageStartupMessages(library('RColorBrewer',logical.return=T) || install.packages('RColorBrewer', repo='http://cran.revolutionanalytics.com'))
-suppressPackageStartupMessages(library('hwriter',logical.return=T) || install.packages('hwriter', repo='http://cran.revolutionanalytics.com'))
-suppressPackageStartupMessages(library('ggforce',logical.return=T) || install.packages('ggforce', repo='http://cran.revolutionanalytics.com'))
-suppressPackageStartupMessages(library('ggrepel',logical.return=T) || install.packages('ggrepel', repo='http://cran.revolutionanalytics.com'))
+suppressPackageStartupMessages(library('tidyverse',logical.return=T) || install.packages('tidyverse'))
+suppressPackageStartupMessages(library('RCurl',logical.return=T) || install.packages('RCurl'))
+suppressPackageStartupMessages(library('hexbin',logical.return=T) || install.packages('hexbin'))
+suppressPackageStartupMessages(library('pheatmap',logical.return=T) || install.packages('pheatmap'))
+suppressPackageStartupMessages(library('RColorBrewer',logical.return=T) || install.packages('RColorBrewer'))
+suppressPackageStartupMessages(library('hwriter',logical.return=T) || install.packages('hwriter'))
+suppressPackageStartupMessages(library('ggforce',logical.return=T) || install.packages('ggforce'))
+suppressPackageStartupMessages(library('ggrepel',logical.return=T) || install.packages('ggrepel'))
 # source("https://bioconductor.org/biocLite.R"); 
 if (!requireNamespace("BiocManager", quietly = TRUE))  install.packages("BiocManager") # change to use bioC 3.9
 suppressPackageStartupMessages(library('vsn',logical.return=T) || BiocManager::install('vsn'));
@@ -144,6 +148,7 @@ if(file.exists(file.path("DESeq2.RData"))) load(file.path("DESeq2.RData")) else 
   rownames(cts) = sub("(^ENS.*)\\..*","\\1",rownames(cts))
   
   ## collapse circRNA to gene, e.g. circDNAJC6, like Dube et al. Nature Neurosicen 2019. Reason: https://stat.ethz.ch/pipermail/bioconductor/2012-February/043410.html
+  ## Note that we still keep circRNAs and ciRNAs from the same host gene separately 
   if(COLLAPSE && gene_type=='circRNA'){
     genes_annotation = mutate(genes_annotation, circID=paste0(sub("RNA","",as.character(circType)),as.character(geneName)))
     dim(cts);  cts = rownames_to_column(cts) %>% mutate(rowname=genes_annotation$circID[match(rowname, genes_annotation$ID)]) %>% group_by(rowname) %>% summarise_all(sum) %>% column_to_rownames(); dim(cts)
@@ -440,6 +445,7 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   
   ## pvalue cutoff
   PVALUE_CUTOFF = ifelse(isEmpty(res$pvalue[res$padj<=0.05]), 0.05, max(res$pvalue[res$padj<=0.05],na.rm = T))  # either the pvalue corresponding to FDR=0.05 or just 0.05
+  message(paste("# PVALUE_CUFOFF is",PVALUE_CUTOFF))
   
   DE  = subset(res, !is.na(pvalue) & pvalue <= PVALUE_CUTOFF & abs(log2FoldChange)>=1)
   DE2 = subset(res, !is.na(pvalue) & pvalue <= PVALUE_CUTOFF & abs(log2FoldChange)<1)
@@ -676,12 +682,40 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
     }
   }
   
+  message("# violin plots between the groups")
+  
+  if(nrow(DE0)>0){
+    individual <- counts(dds,normalized=TRUE)[rownames(DE0),]
+    colnames(individual) = dds[[variable]]
+    
+    df = rownames_to_column(as.data.frame(individual)) %>% gather(key=variable, value = "norm_expressed", -1) %>% 
+      mutate(!!variable := gsub("(.*)\\..*","\\1",variable)) # %>% # filter(rowname=='chr13_78293666_78320990')
+    
+    # remove NA
+    df=df[!is.na(df[[variable]]),]
+    df=df[!is.na(df$norm_expressed),]
+    df=df[!is.na(df$rowname),]
+    
+    for(i in 1:ceiling(length(unique(df$rowname))/16)){
+      p = ggplot(df, aes_string(x=variable, y="norm_expressed")) + 
+        geom_violin(trim=FALSE, fill="gray")+
+        geom_boxplot(width=0.1)+
+        scale_y_log10() + 
+        facet_wrap_paginate(~rowname, nrow = 4, ncol = 4, page = i, scales='free') + 
+        labs(title="Plot of expression by case and control",x="Groups", y = "Normalized expression")+
+        theme_classic() 
+      class(p) <- c('gg_multiple', class(p))
+      print(p)
+    }
+  }
+  
   ## for input list of genes
-  if(!is.null(file_of_gene_list) && file.exists(file_of_gene_list)){
+  if(!is.null(file_of_gene_list) && file.exists(file.path(pwd,file_of_gene_list))){
     ## ==============================
     message("# heatmap for the input list of genes")
     ## ==============================
-    geneList = scan(file = file_of_gene_list)
+    #geneList = scan(file = file.path(pwd,file_of_gene_list))
+    geneList=read.table(file.path(pwd,file_of_gene_list), stringsAsFactors =F)$V1
     topDE=vsd_adjusted_log2[geneList,rownames(colData(dds))]; 
     if(!COLLAPSE) rownames(topDE) = paste(RES[geneList,'geneName'], rownames(topDE), sep=".")
     
@@ -732,12 +766,10 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
              #cutree_cols=2,
              cluster_cols = F,
              clustering_distance_cols = "correlation")
-  }
-  
-  message("# violin plots between the groups")
-  
-  if(nrow(DE0)>0){
-    individual <- counts(dds,normalized=TRUE)[rownames(DE0),]
+    
+    message("# violin plots between the groups")
+
+    individual <- counts(dds,normalized=TRUE)[geneList,]
     colnames(individual) = dds[[variable]]
     
     df = rownames_to_column(as.data.frame(individual)) %>% gather(key=variable, value = "norm_expressed", -1) %>% 
@@ -759,6 +791,7 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
       class(p) <- c('gg_multiple', class(p))
       print(p)
     }
+
   }
   
   dev.off() 
@@ -780,15 +813,15 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   keep <- rowSums(counts(dds) >= 5) >= 4  # at least 4 samples with more than 5 reads
   dim(dds); dds <- dds[keep,]; dim(dds);
   
-  dds[[variable]]=factor(dds[[variable]])
-  levels(dds[[variable]]) = union(variable_REF, levels(dds[[variable]])) # put the REF in the first in the levels
+  # Important bug fix on 10/7/2021 (affect the volcano plot, heatmap, etc.)
+  dds[[variable]]=factor(dds[[variable]], levels= union(variable_REF, unique(dds[[variable]]))) # put the REF in the first in the levels
   
   # factorize
   covariances=c();
   for(i in c('AGE', 'RIN', 'PMI')) if(i %in% colnames(covarianceTable) & !(i %in% covariances)) {covariances=c(covariances,i);}
   for(i in c('SEX', 'BATCH', 'CELLTYPE', variable)) if(i %in% colnames(covarianceTable) & !(i %in% covariances)) {dds[[i]] <- droplevels(dds[[i]]); if(length(levels(dds[[i]]))>1) covariances=c(covariances,i);}
   
-  str(colData(dds))
+  #str(colData(dds))
   
   design(dds) <- as.formula(paste(" ~ ", paste(covariances, collapse= " + ")))
   
@@ -846,9 +879,9 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   res <- res[order(res$pvalue),]
   head(res); dim(res)
   
-  # remove lines with NA in p.value
-  res <- res[!is.na(res$pvalue),]
-  dim(res)
+  ## remove lines with NA in p.value -- Unnecessary since is.na() is checked below
+  # res <- res[!is.na(res$pvalue),]
+  # dim(res)
   
   # write to xls
   write.table(as.data.frame(res), 
@@ -858,6 +891,13 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   
   ## pvalue cutoff
   PVALUE_CUTOFF = ifelse(isEmpty(res$pvalue[res$padj<=0.05]), 0.05, max(res$pvalue[res$padj<=0.05],na.rm = T))  # either the pvalue corresponding to FDR=0.05 or just 0.05
+  message(paste("# PVALUE_CUFOFF is",PVALUE_CUTOFF))
+  
+  ## add circID
+  res$circID=rownames(res)
+  
+  ## save the orignal res as res0, since it may be used if --gene_list is used below 
+  res0=as.data.frame(res)
   
   DE  = subset(res, !is.na(pvalue) & pvalue <= PVALUE_CUTOFF & abs(log2FoldChange)>=1)
   DE2 = subset(res, !is.na(pvalue) & pvalue <= PVALUE_CUTOFF & abs(log2FoldChange)<1)  
@@ -892,14 +932,16 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
          ylim=range(RES[[REF]], RES[[ALT]])+1, 
          col=if(gene_type=='circRNA') ifelse(RES$circType=="circRNA",'red','orange') else ifelse(RES$geneType=="protein_coding",'red','orange'))
     RES0=RES[RES[[REF]]>=max(RES[[REF]], RES[[ALT]])/3 | RES[[ALT]]>=max(RES[[REF]], RES[[ALT]])/3,]
-    text(x=1+RES0[[REF]], y=1+RES0[[ALT]], labels = RES0$geneName, cex=.5, adj=c(0.5,0), pos=3, offset = .3);
+    #text(x=1+RES0[[REF]], y=1+RES0[[ALT]], labels = RES0$geneName, cex=.5, adj=c(0.5,0), pos=3, offset = .3); # use host gene symbol
+    text(x=1+RES0[[REF]], y=1+RES0[[ALT]], labels = RES0$circID, cex=.5, adj=c(0.5,0), pos=3, offset = .3); # use circ/ci + host gene symbol
+    legend("bottomright", pch=19, if(gene_type=='circRNA') c("circRNA",'ciRNA') else c('protein-coding gene','ncRNA gene'), title='gene type', col = c('red','orange')) 
     abline(a=0,b=1, lty=2, col='black')
   }
   
   ## ==============================
   # vocano plot
   ## ==============================
-  p=ggplot(RES, aes(x=log2FoldChange, y=-log10(pvalue), label=geneName)) +
+  p=ggplot(RES, aes(x=log2FoldChange, y=-log10(pvalue), label=circID)) +
     geom_point(color = ifelse(RES$pvalue > PVALUE_CUTOFF, "gray", if(gene_type=="circRNA") ifelse(RES$circType=='circRNA',"red", "orange") else ifelse(RES$geneType=='protein_coding',"red", "orange")), size=3) +
     geom_hline(yintercept = -log10(PVALUE_CUTOFF), color='black', size=.5, linetype = 2) + 
     geom_vline(xintercept = c(0,-1, 1), color=c('black','gray','gray'), size=.5, linetype = 2) +
@@ -935,7 +977,7 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   } else if(variable=="CONDITION2") {
     annotation_col = rownames_to_column(as.data.frame(colData(dds))) %>% arrange(!!as.name(variable), CONDITION) %>% dplyr::select(rowname,variable, CONDITION) %>% column_to_rownames()
   } else
-    annotation_col = rownames_to_column(as.data.frame(colData(dds))) %>% arrange(!!as.name(variable)) %>% dplyr::select(rowname,variable) %>% column_to_rownames()
+    annotation_col = rownames_to_column(as.data.frame(colData(dds))) %>% arrange(!!as.name(variable)) %>% dplyr::select(rowname,all_of(variable)) %>% column_to_rownames()
   
   # reorder topDE
   topDE=topDE[rownames(annotation_row), rownames(annotation_col)]
@@ -1042,17 +1084,47 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
              clustering_distance_cols = "correlation")
   }
   
+  message("# violin plots between the groups")
+  
+  if(nrow(DE0)>0){
+    individual <- counts(dds,normalized=TRUE)[rownames(DE0),]
+    colnames(individual) = dds[[variable]]
+    
+    df = rownames_to_column(as.data.frame(individual)) %>% gather(key=variable, value = "norm_expressed", -1) %>% 
+      mutate(!!variable := gsub("(.*)\\..*","\\1",variable))
+    
+    # remove NA
+    df=df[!is.na(df[[variable]]),]
+    df=df[!is.na(df$norm_expressed),]
+    df=df[!is.na(df$rowname),]
+    
+    for(i in 1:ceiling(length(unique(df$rowname))/16)){
+      p = ggplot(df, aes_string(x=variable, y="norm_expressed")) + 
+        geom_violin(trim=FALSE, fill="gray")+
+        geom_boxplot(width=0.1)+
+        scale_y_log10() + 
+        facet_wrap_paginate(~rowname, nrow = 4, ncol = 4, page = i, scales='free') + 
+        labs(title="Plot of expression by case and control",x="Groups", y = "Normalized expression")+
+        theme_classic() 
+      class(p) <- c('gg_multiple', class(p))
+      print(p)
+    }
+  }
+  
+  dev.off()
+  
   ## for input list of genes
-  if(!is.null(file_of_gene_list) && file.exists(file_of_gene_list)){
+  if(!is.null(file_of_gene_list) && file.exists(file.path(pwd,file_of_gene_list))){
+    ## MAKING PLOTS
+    pdf(file.path(paste("DEresult",output_dir, com_name ,"subset", file_of_gene_list,"pdf", sep = ".")), paper = 'USr')
     ## ==============================
     message("# heatmap for the input list of genes")
     ## ==============================
-    geneList=read.table(file_of_gene_list, stringsAsFactors =F)$V1
-    
+    geneList=read.table(file.path(pwd,file_of_gene_list), stringsAsFactors =F)$V1
     topDE=assay(vsd)[geneList,rownames(colData(dds))]; 
-    if(!COLLAPSE) rownames(topDE) = paste(RES[geneList,'geneName'], rownames(topDE), sep=".")
+    if(!COLLAPSE) rownames(topDE) = paste(res0[geneList,'geneName'], rownames(topDE), sep=".")
     
-    annotation_row = dplyr::select(RES[geneList,], one_of(c('circType','geneType', 'pvalue', 'log2FoldChange', 'baseMean', 'geneName'))) %>% rownames_to_column() %>% 
+    annotation_row = dplyr::select(res0[geneList,], one_of(c('circType','geneType', 'pvalue', 'log2FoldChange', 'baseMean', 'geneName'))) %>% rownames_to_column() %>% 
       rowwise() %>% mutate(updown=ifelse(log2FoldChange>0,"up","down"), rowname=ifelse(COLLAPSE, rowname, paste(geneName, rowname, sep=".")), updownP=ifelse(log2FoldChange>0,pvalue,-1*pvalue),) %>% 
       arrange(updown, -updownP) %>% select(rowname, one_of('updown','circType','geneType')) %>% column_to_rownames()
     
@@ -1067,7 +1139,7 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
       circType = c(circRNA = "red", ciRNA = "orange"))
     
     ## add color for geneType
-    genetypes = sort(table(as.character(RES[geneList,'geneType'])), decreasing = T)
+    genetypes = sort(table(as.character(res0[geneList,'geneType'])), decreasing = T)
     genetypes = setNames(colorRampPalette(brewer.pal(9, "Set1"))(length(genetypes)), names(genetypes))
     ann_colors = c(geneType = list(genetypes), ann_colors)
     
@@ -1099,11 +1171,10 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
              #cutree_cols=2,
              cluster_cols = F,
              clustering_distance_cols = "correlation")
-  }
-  message("# violin plots between the groups")
-  
-  if(nrow(DE0)>0){
-    individual <- counts(dds,normalized=TRUE)[rownames(DE0),]
+    
+    message("# violin plots between the groups")
+    
+    individual <- counts(dds,normalized=TRUE)[geneList,]
     colnames(individual) = dds[[variable]]
     
     df = rownames_to_column(as.data.frame(individual)) %>% gather(key=variable, value = "norm_expressed", -1) %>% 
@@ -1114,20 +1185,19 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
     df=df[!is.na(df$norm_expressed),]
     df=df[!is.na(df$rowname),]
     
-    for(i in 1:ceiling(length(unique(df$rowname))/16)){
+    for(i in 1:ceiling(length(unique(df$rowname))/4)){
       p = ggplot(df, aes_string(x=variable, y="norm_expressed")) + 
         geom_violin(trim=FALSE, fill="gray")+
         geom_boxplot(width=0.1)+
         scale_y_log10() + 
-        facet_wrap_paginate(~rowname, nrow = 4, ncol = 4, page = i, scales='free') + 
+        facet_wrap_paginate(~rowname, nrow = 2, ncol = 2, page = i, scales='free') + 
         labs(title="Plot of expression by case and control",x="Groups", y = "Normalized expression")+
         theme_classic() 
       class(p) <- c('gg_multiple', class(p))
       print(p)
     }
+    dev.off() 
   }
-  
-  dev.off() 
   
   message("## Exporting results to HTML")
   
@@ -1138,11 +1208,14 @@ if(length(str_comparison)==1){  # e.g. --comparison="PMI"
   
 } else stop("Unrecognized comparison format. Please use style like --comparison=DX:PD:HC", call. = F);
 
-###########################################
-message("#step5: scp html result to web server")
-###########################################
-## Note: prerequisites: 1. generate public key via "ssh-keygen" if not already (~/.ssh/id_rsa.pub); 2. add ~/.ssh/id_rsa.pub to remote server's ~/.ssh/authorized_keys 
-system(paste0("rsync -a --chmod=u+rwx,g+rwx,o+rwx report/* xd010@panda.dipr.partners.org:~/public_html/DE_reports/",output_dir))
-message(paste0("Visit the HTML result at: http://panda.partners.org/~xd010/DE_reports/",output_dir))
+# ###########################################
+# message("#step5: scp html result to web server")
+# ###########################################
+# ## Note: prerequisites: 1. generate public key via "ssh-keygen" if not already (~/.ssh/id_rsa.pub); 2. add ~/.ssh/id_rsa.pub to remote server's ~/.ssh/authorized_keys 
+# system(paste0("rsync -a --chmod=u+rwx,g+rwx,o+rwx report/* xd010@panda.dipr.partners.org:~/public_html/DE_reports/",output_dir))
+# message(paste0("Visit the HTML result at: http://panda.partners.org/~xd010/DE_reports/",output_dir))
 
 message("Done!")
+
+message("### R sessionInfo():")
+sessionInfo()

@@ -1,25 +1,17 @@
-# Usage: 
-# bash $pipeline_path/src/eRNA.SNP.enrichment.sh SNAP $i; done 
-# for i in HCILB_SNDA HC_TCPY HC_MCPY HC_FB HC_PBMC; do echo $i; bsub -n 1 -q normal -J $i bash $pipeline_path/src/eRNA.SNP.enrichment.sh SNAP $i; done 
-
-# alternatively,
-## for i in HCILB_SNDA HC_PY HC_nonNeuron; do echo $i; bsub -n 1 -q normal -J $i bash $pipeline_path/src/eRNA.SNP.enrichment.sh PLINK $i; done 
-# bsub -n 1 -q normal -J HCILB_SNDA bash $pipeline_path/src/eRNA.SNP.enrichment.sh SNAP HCILB_SNDA
+# bash script to generate input file for test the SNP co-localization enrichment analysis
 
 type='SNAP'
-samplegroup=$2
-
-# debug
-# type='SNAP'; samplegroup='HCILB_SNDA'
 
 cd ~/projects/circRNA/data/
-circRNA_annotation=Merge_circexplorer_BC106.filtered.enriched.annotation.bed14  # BRAINCODE filted only
+#circRNA_annotation=Merge_circexplorer_BC106.filtered.enriched.annotation.bed14  # BRAINCODE filted only
+circRNA_annotation=Merge_circexplorer_BC109.filtered.enriched.annotation.bed14  # BRAINCODEv2 filted only
+
 
 ## pre-steps to get LD data for GWAS SNPs: 
 ## Ref ~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/GWASCatalog/README.txt
 
 [ "$type" == "SNAP" ] && snps_in_LD=$GENOME/Annotation/GWASCatalog/gwas_catalog_v1.0-downloaded.hg19.snps_in_LD.SNAP.LD_w250.r2_0.8.bed  # in the final figure we used SNAP
-#[ "$type" == "PLINK" ] && snps_in_LD=$GENOME/Annotation/GWASCatalog/gwas_catalog_v1.0-downloaded.hg19.snps_in_LD.PLINK.LD_w250.r2_0.8.bed
+[ "$type" == "PLINK" ] && snps_in_LD=$GENOME/Annotation/GWASCatalog/gwas_catalog_v1.0-downloaded.hg19.snps_in_LD.PLINK.LD_w250.r2_0.8.bed
 
 ## extract all autosomal.associations
 #[ -e $snps_in_LD.autosomal.associations.bed ] || awk 'BEGIN{FS="\t"; OFS="\t";}{split($8,a,"|");  n=split(a[2],b,";"); print $1,$2,$3,$7; for(i=1;i<n;i++) print $1,b[i]-1,b[i],$7;}' $snps_in_LD | grep -v chrX | grep -v chrY | sort -u > $snps_in_LD.autosomal.associations.bed

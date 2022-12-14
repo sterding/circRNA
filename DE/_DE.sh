@@ -3,60 +3,6 @@
 ###########################################
 #!/bin/sh
 
-
-# begin R script
-library("tidyverse")
-library(RCurl)
-setwd("~/projects/circRNA/results")
-
-## BRAINcode v2
-subjectTable_url="https://docs.google.com/spreadsheets/d/e/2PACX-1vQFQ4aQj0sD9oxIqaZ-cEgo7kWcCmNYGBH9emLw8iNu0f6TTjKE5Lte7IBfoMMy57cLjA4pXE0YlPY2/pub?gid=28&single=true&output=tsv"
-sampleTable_url="https://docs.google.com/spreadsheets/d/e/2PACX-1vQFQ4aQj0sD9oxIqaZ-cEgo7kWcCmNYGBH9emLw8iNu0f6TTjKE5Lte7IBfoMMy57cLjA4pXE0YlPY2/pub?gid=1049148747&single=true&output=tsv"
-subjectTable=read.delim(textConnection(getURL(subjectTable_url)), stringsAsFactors = F) %>% 
-  select(CONDITION=DIAGNOSIS, SUBJECT_ID=SOURCE_SUBJECT_ID, AGE, SEX, PMI, PD.pathology.group, MUSS=Modified_Unified_Staging_System, Unified_LB_Stage, AD.pathology.group,	Plaque_density,	CERAD,	Braak_Braak_stage,	NIA_Reagan, MMSE=MMSE_last)
-sampleTable=read.delim(textConnection(getURL(sampleTable_url)), stringsAsFactors = F, comment.char = "#") %>%
-  filter(BRAINcode2.final.selection==1) %>% 
-  select(SAMPLE_ID=SOURCE_SAMPLE_ID, SUBJECT_ID=SOURCE_SUBJECT_ID, CELLTYPE=CELL, BATCH, RIN)
-head(subjectTable); head(sampleTable); 
-dim(sampleTable) # n=284
-
-## PD pathology group table
-## Note: CONDITION includes PD, ILB, and HC; CONDITION2 includes PD (PD+ILB) and HC;
-left_join(x=sampleTable, y=subjectTable, by = "SUBJECT_ID") %>% filter(CELLTYPE=="SNDA") %>% 
-  select(SUBJECT_ID, CONDITION, AGE, SEX, PMI, MUSS, Unified_LB_Stage, PD.pathology.group, SAMPLE_ID, CELLTYPE, BATCH, RIN) %>% 
-  mutate(PDpathologygroup=ifelse(PD.pathology.group=="no","hc",ifelse(PD.pathology.group=="late" | PD.pathology.group=="early","pd",PD.pathology.group))) %>%
-  mutate(CONDITION2=ifelse(CONDITION=="ILB" | CONDITION=="PD","PD",CONDITION)) %>%
-  arrange(CONDITION2, CONDITION) %>% 
-  write.table(file="Table.PD.SNDA.pathology.covariates.xls", sep="\t", col.names = TRUE, row.names = F, quote = F)
-
-## AD pathology group table
-left_join(x=sampleTable, y=subjectTable, by = "SUBJECT_ID") %>% filter(CELLTYPE=="TCPY") %>% 
-  select(SUBJECT_ID, CONDITION, AGE, SEX, PMI, Plaque_density, CERAD, Braak_Braak_stage, NIA_Reagan,  MMSE, AD.pathology.group, SAMPLE_ID, CELLTYPE, BATCH, RIN) %>% 
-  arrange(AD.pathology.group, CONDITION) %>% 
-  write.table(file="Table.AD.TCPY.pathology.covariates.xls", sep="\t", col.names = TRUE, row.names = F, quote = F)
-
-## PD CSF pathology group table
-left_join(x=sampleTable, y=subjectTable, by = "SUBJECT_ID") %>% filter(CELLTYPE=="CSF") %>% 
-  select(SUBJECT_ID, CONDITION, AGE, SEX, SAMPLE_ID, CELLTYPE, BATCH) %>% 
-  arrange(CONDITION) %>% 
-  write.table(file="Table.PD.CSF.pathology.covariates.xls", sep="\t", col.names = TRUE, row.names = F, quote = F)
-
-## Bennett: AD/PD total RNAseq pathology group table
-sampleTable_url="https://docs.google.com/spreadsheets/d/e/2PACX-1vQFQ4aQj0sD9oxIqaZ-cEgo7kWcCmNYGBH9emLw8iNu0f6TTjKE5Lte7IBfoMMy57cLjA4pXE0YlPY2/pub?gid=1322938821&single=true&output=tsv"
-sampleTable=read.delim(textConnection(getURL(sampleTable_url)), stringsAsFactors = F, comment.char = "#") %>%
-  filter(Seq_type=='RNAseq') %>% 
-  select(SAMPLE_ID=SampleID, SUBJECT_ID=SubjectID, CELLTYPE=Tissue, CONDITION=Neuropath_Dx, AGE=Age, RIN)
-head(sampleTable); 
-dim(sampleTable) # n=42
-filter(sampleTable, CELLTYPE=="VMB") %>% 
-  select(SUBJECT_ID, CONDITION, AGE, SAMPLE_ID, RIN) %>% 
-  arrange(CONDITION) %>% 
-  write.table(file="Table.Bennett.PD.VMP.pathology.covariates.xls", sep="\t", col.names = TRUE, row.names = F, quote = F)
-filter(sampleTable, CELLTYPE=="FCX") %>% 
-  select(SUBJECT_ID, CONDITION, AGE, SAMPLE_ID, RIN) %>% 
-  arrange(CONDITION) %>% 
-  write.table(file="Table.Bennett.AD.FCX.pathology.covariates.xls", sep="\t", col.names = TRUE, row.names = F, quote = F)
-
 cd ~/projects/circRNA/results/
 #Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C CONDITION:PD:HC -s
 #Rscript ~/projects/circRNA/src/DE/_DE.R -i ../data/Merge_circexplorer_BC197.filtered.enriched.rawcount.rds -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA -O mi -C CONDITION:ILB:HC -s
@@ -106,10 +52,17 @@ cd ~/projects/circRNA/results/DE_SNDA; Rscript ~/projects/circRNA/src/DE/_WGCNA.
 ## gene
 ##======================
 cd ~/neurogen/rnaseq_PD/results/; Rscript ~/projects/circRNA/src/DE/_DE.R -i merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA.gene -O Mmi -C CONDITION2:PD:HC -t gene
+cd ~/neurogen/rnaseq_PD/results/; Rscript ~/projects/circRNA/src/DE/_DE.R -i merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA.gene -O Mmi -C CONDITION:ILB:HC -t gene
 cd ~/neurogen/rnaseq_PD/results/; Rscript ~/projects/circRNA/src/DE/_DE.R -i merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA.gene -O Mmi -C MUSS -t gene
 cd ~/neurogen/rnaseq_PD/results/; Rscript ~/projects/circRNA/src/DE/_DE.R -i merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls -c Table.AD.TCPY.pathology.covariates.xls -o DE_TCPY.gene -O Mmi -C CONDITION:AD:HC -t gene
 cd ~/neurogen/rnaseq_PD/results/; Rscript ~/projects/circRNA/src/DE/_DE.R -i merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls -c Table.AD.TCPY.pathology.covariates.xls -o DE_TCPY.gene -O Mmi -C Braak_Braak_stage -t gene
 cd ~/neurogen/rnaseq_CSF/results; Rscript ~/projects/circRNA/src/DE/_DE.R -i merged/genes.htseqcount.cufflinks.CSF.uniq.xls -c Table.PD.CSF.pathology.covariates.xls -o DE_CSF.gene -O Mmi -C CONDITION:PD:HC -t gene
+
+# make plot for example genes ERIC1, DNAJC6, DYM
+cd ~/neurogen/rnaseq_PD/results/; 
+grep -Ew "ERC1|DNAJC6|DYM" DE_SNDA.gene/DEresult.DE_SNDA.gene.CONDITION2_PD_vs_HC.f1-17.xls | sort -k1,1 | cut -f1 | sort -u > ERC1.DNAJC6.DYM.txt
+Rscript ~/projects/circRNA/src/DE/_DE.R -i merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA.gene -O Mmi -C CONDITION2:PD:HC -t gene -l ERC1.DNAJC6.DYM.txt
+Rscript ~/projects/circRNA/src/DE/_DE.R -i merged/genes.htseqcount.cufflinks.allSamples.BCv2.uniq.xls -c Table.PD.SNDA.pathology.covariates.xls -o DE_SNDA.gene -O Mmi -C CONDITION:ILB:HC -t gene -l ERC1.DNAJC6.DYM.txt
 
 
 ## pathway analysis

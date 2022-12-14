@@ -87,6 +87,7 @@ table(filter(readRDS("Merge_circexplorer_CSF87.annotation.bed14.rds"),ID %in% ro
 # circRNA   ciRNA 
 # 24    3827 
 table(filter(readRDS("Merge_circexplorer_BC197.annotation.bed14.rds"),ID %in% rownames(Merge_circexp_raw_filtered_SNDA)) %>% pull(circType))
+
 ###########################################
 ############ filter cirRNAs     ###########
 ###########################################
@@ -102,8 +103,27 @@ saveRDS(Merge_circexp_raw_filtered, file="Merge_circexplorer_CSF87.filtered.rawc
 saveRDS(Merge_circexp_norm_filtered, file="Merge_circexplorer_CSF87.filtered.normRPM.rds")
 saveRDS(annotation_filtered, file="Merge_circexplorer_CSF87.filtered.annotation.bed14.rds")
 
+# Q: How many are they also detected in TCPY?
+Merge_circexp_raw_filtered=readRDS("Merge_circexplorer_CSF87.filtered.rawcount.rds")
+Merge_circexp_raw_TCPY=readRDS("Merge_circexplorer_BC190.filtered.rawcount.rds") %>% select(contains("TCPY"))
+head(Merge_circexp_raw_TCPY); dim(Merge_circexp_raw_TCPY);
+Merge_circexp_raw_filtered_TCPY=Merge_circexp_raw_TCPY[rowSums(Merge_circexp_raw_TCPY)>0,]
+dim(Merge_circexp_raw_filtered_TCPY)
+sum(rownames(Merge_circexp_raw_filtered) %in% rownames(Merge_circexp_raw_filtered_TCPY))
+# 140
 
-## enriched
+# Q: How many are they also detected in brain neurons?
+Merge_circexp_raw_filtered=readRDS("Merge_circexplorer_CSF87.filtered.rawcount.rds")
+Merge_circexp_raw_brain=readRDS("Merge_circexplorer_BC190.filtered.rawcount.rds") %>% select(contains(c("TCPY","MCPY","SNDA")))
+head(Merge_circexp_raw_brain); dim(Merge_circexp_raw_brain);
+Merge_circexp_raw_filtered_brain=Merge_circexp_raw_brain[rowSums(Merge_circexp_raw_brain)>0,]
+dim(Merge_circexp_raw_filtered_brain)
+sum(rownames(Merge_circexp_raw_filtered) %in% rownames(Merge_circexp_raw_filtered_brain))
+# 382
+
+########################################################
+############ enriched cirRNAs in RNase treatment #######
+########################################################
 
 Merge_circexp_raw_long_enriched.RM  = readRDS(file="Merge_circexp_raw_long_filterd.RM.rds")
 

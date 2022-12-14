@@ -1,4 +1,4 @@
-## R script to test if circRNA can protect RNA from degradation
+## R script to test if circRNA can protect mRNA from degradation
 ## TODO: Limit to only single-exon circRNAs
 
 library(RCurl)

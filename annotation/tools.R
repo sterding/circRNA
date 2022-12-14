@@ -104,7 +104,7 @@ disease_enrichment_v2 <- function (genes, vocabulary = "HGNC", verbose = TRUE, g
   }
   diseases <- unique(gdas[c("diseaseId", "diseaseName")])
   if (type == "symbol") {
-    genes <- unique(subset(gdas, geneSymbol %in% genes)$geneId)
+    genes <- unique(subset(gdas, geneSymbol %in% genes)$geneId) # Note: here only the genes in gdas$geneSymbol are taken into test
     universe <- unique(as.character(gdas$geneSymbol))
   }
   else {
@@ -128,7 +128,7 @@ disease_enrichment_v2 <- function (genes, vocabulary = "HGNC", verbose = TRUE, g
                      GeneRatio = character(), BgRatio = character(), OR=numeric(), geneID = character(), 
                      pvalue = numeric(), Count = integer(), stringsAsFactors = FALSE)
   i <- 1
-  diseaselist <- as.character(unique(gdas[gdas$geneId %in% genes, ]$diseaseId))
+  diseaselist <- as.character(unique(gdas[gdas$geneId %in% genes, ]$diseaseId))  # test only those diseases with at least 1 associated genes in the input gene set
   for (dd in diseaselist) {
     aa <- subset(gdas, diseaseId == dd)$geneId
     inter <- length(intersect(aa, genes))
@@ -146,6 +146,7 @@ disease_enrichment_v2 <- function (genes, vocabulary = "HGNC", verbose = TRUE, g
                    GeneRatio, BgRatio, OR, geneID, pv, inter)
     i <- i + 1
   }
+  data$pvalue <- as.numeric(data$pvalue)
   data$FDR <- p.adjust(data$pvalue, method = "BH")
   data$Count <- as.numeric(as.character(data$Count))
   data$gg <- data$Count/length(genes)
@@ -154,7 +155,7 @@ disease_enrichment_v2 <- function (genes, vocabulary = "HGNC", verbose = TRUE, g
   return(data)
 }
 # revised plot_enrichment @ disgenet2r package
-plot_enrichment <- function( input, cutoff , count, limit ) {
+plot_enrichment <- function( input, cutoff , count, title="DisGeNET enrichment", limit ) {
   input<- subset(input, FDR < cutoff & Count > count  )
   if ( dim( input )[ 1 ] > limit ){
     input <- input[ 1:limit ,]
@@ -163,7 +164,6 @@ plot_enrichment <- function( input, cutoff , count, limit ) {
   
   idx <- order(input$OR, decreasing = T)
   input$Description<-factor(input$Description, levels=rev(unique(input$Description[idx])))
-  title <- "DisGeNET enrichment"
   p <- ggplot2::ggplot(input, ggplot2::aes_string(x= input$OR, y="Description", size=input$Count, color=input$FDR)) +
     ggplot2::geom_point() +
     ggplot2::scale_color_continuous(low="red", high="blue", name = "FDR", guide=ggplot2::guide_colorbar(reverse=TRUE)) +

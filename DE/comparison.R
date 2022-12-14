@@ -9,12 +9,14 @@ genes_annotation = read.table("~/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19
 ### =======================
 ## DE_TCPY vs. DE_SNDA
 ### =======================
-df1=read.table("DE_TCPY/DEresult.DE_TCPY.CONDITION_AD_vs_HC.xls", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
-df2=read.table("DE_SNDA/DEresult.DE_SNDA.CONDITION2_PD_vs_HC.xls", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df1=read.table("DE_TCPY/DEresult.DE_TCPY.CONDITION_AD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df2=read.table("DE_SNDA/DEresult.DE_SNDA.CONDITION2_PD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
 df1df2 = inner_join(rownames_to_column(df1) %>% filter(pvalue<=1) %>% select(1:8), 
                     rownames_to_column(df2) %>% filter(pvalue<=1) %>% select(1:12), 
                     by = 'rowname') # %>% mutate(log2FoldChange.y=-1*log2FoldChange.y) # sign of fold change for continous variable?
 head(df1df2)
+# add circID
+df1df2$circID=paste0(sub("RNA","",as.character(df1df2$circType)),as.character(df1df2$geneName))
 
 pdf(file = "ADPD.DE.barplot.pdf", paper = 'US')
 
@@ -24,7 +26,9 @@ gplots::venn(list(AD = rownames(df1), PD = rownames(df2)))
 # correlation between the them
 cortest = cor.test(df1df2$log2FoldChange.x, df1df2$log2FoldChange.y,alternative = "two.sided", method = "pearson")
 
-ggplot(df1df2, aes(x=log2FoldChange.x, y=log2FoldChange.y, label=rowname)) +
+ggplot(df1df2, aes(x=log2FoldChange.x, y=log2FoldChange.y, label=paste(circID, rowname, sep = "\n"))) +
+  geom_hline(yintercept = 0, color='black', size=.5, linetype = 2) + 
+  geom_vline(xintercept = 0, color='black', size=.5, linetype = 2) +
   geom_text_repel(
     data          = subset(df1df2, pvalue.x<=0.05 | pvalue.y<=0.05),
     nudge_y       = 0,
@@ -56,7 +60,7 @@ df = filter(df1df2, pvalue.x<=0.05 | pvalue.y<=0.05) %>% mutate(log2FoldChangeX 
   select(genename, AD_vs_HC=log2FoldChange.x, PD_vs_HC=log2FoldChange.y) 
 df$genename= factor(df$genename, levels = as.character(df$genename))
 p= ggplot(gather(df, key="comparison", value="log2FoldChange", 2:3), aes(x=genename, y=log2FoldChange, fill=comparison)) +
-  geom_bar(stat="identity", position=position_dodge()) + coord_flip()  + 
+  geom_bar(stat="identity", position=position_dodge(), width=0.5) + coord_flip()  + 
   # geom_text(aes(label=paste0(observed," (",round(OR,1),")")), position = position_dodge(width=1), hjust=0, vjust=.5, angle = 90, size=2.5) +  # TODO: add significance *
   theme_minimal() + theme(legend.justification=c(1,0), legend.position=c(1,0))
 print(p)
@@ -118,7 +122,7 @@ df = df %>% gather(key, value, -genename) %>%
   mutate(comparison = case_when(comparison=="x" ~ "AD_vs_HC", comparison=="y" ~ "PD_vs_HC"))
 
 p= df %>% ggplot(aes(x=genename, y=log2FoldChange, fill=comparison, alpha=pvalue<0.05)) +
-  geom_bar(stat="identity", position=position_dodge()) + coord_flip()  + 
+  geom_bar(stat="identity", position=position_dodge(), width=0.5) + coord_flip()  + 
   # geom_text(aes(label=paste0(observed," (",round(OR,1),")")), position = position_dodge(width=1), hjust=0, vjust=.5, angle = 90, size=2.5) +  # TODO: add significance *
   theme_minimal() + theme(legend.justification=c(1,0), legend.position=c(1,0))
 print(p)
@@ -128,8 +132,8 @@ dev.off()
 ### =======================
 ## DE2gene_TCPY: AD vs. Braak
 ### =======================
-df1=read.table("DE2gene_TCPY/DEresult.DE2gene_TCPY.CONDITION_AD_vs_HC.xls", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
-df2=read.table("DE2gene_TCPY/DEresult.DE2gene_TCPY.Braak_Braak_stage.xls", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df1=read.table("DE2gene_TCPY/DEresult.DE2gene_TCPY.CONDITION_AD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df2=read.table("DE2gene_TCPY/DEresult.DE2gene_TCPY.Braak_Braak_stage.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
 df1df2 = inner_join(rownames_to_column(df1) %>% filter(pvalue<=1) %>% select(1:8), 
                     rownames_to_column(df2) %>% filter(pvalue<=1) %>% select(1:13), 
                     by = 'rowname') %>%
