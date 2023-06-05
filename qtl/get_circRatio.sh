@@ -1,10 +1,14 @@
 # script to compute the circularization ratio of circRNA
 cd ~/projects/circRNA/data/
 
+# the files and their outputs are now moved to backup_circExplorer2_v20190819 folder
 #circRNA_annotation=Merge_circexplorer_BC.annotation.bed14  # BRAINCODE only
 #circRNA_annotation=Merge_circexplorer_BC_RM.annotation.bed14  # BRAINCODE+RM
 #circRNA_annotation=Merge_circexplorer_BC.annotation.bed14.matched  # BC exon number- and length-matched controls
-circRNA_annotation=exons.internal.meta.pc.bed  # internal meta exons in the genome background
+
+# 03/08/2023: update to use Merge_circexplorer_BC197
+circRNA_annotation=Merge_circexplorer_BC197.filtered.enriched.annotation.bed14  # BC197
+#circRNA_annotation=exons.internal.meta.pc.bed  # internal meta exons in the genome background
 
 ##========================================================================
 # 1. get the 1nt--1nt around the two ends of circRNA
@@ -54,6 +58,7 @@ gzip $circRNA_annotation.s3s5
 
 # alternative way
 awk -vi=$circRNA_annotation.2ntAtEnds.bed6 '{print > i"."$1}' $circRNA_annotation.2ntAtEnds.bed6
+TMPDIR=/data/neurogen/tmp/xd010
 for i in ~/neurogen/rnaseq_PD/run_output/*/accepted_hits.bam; do
   sampleName=`echo $i | sed 's/.*output\/\(.*\)\/accepted_hits.*/\1/g'`
   for y in `seq 1 22` X Y; do

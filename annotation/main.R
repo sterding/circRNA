@@ -1,5 +1,4 @@
 ## Main script to work on the output of circExplorer
-library('dplyr')
 library('reshape2')
 library('tidyverse')
 library('ggpubr') # install.packages("ggpubr")
@@ -49,8 +48,13 @@ head(Merge_circexp_raw); dim(Merge_circexp_raw)
 ############## normalize to RPM ###########
 ###########################################
 BRAINCODE2_Sequencing_Log.RNAseq_statistics="https://docs.google.com/spreadsheets/d/e/2PACX-1vQFQ4aQj0sD9oxIqaZ-cEgo7kWcCmNYGBH9emLw8iNu0f6TTjKE5Lte7IBfoMMy57cLjA4pXE0YlPY2/pub?gid=1049148747&single=true&output=tsv"
-require(RCurl)
-RNAseq_statistics<- read.delim(textConnection(getURL(BRAINCODE2_Sequencing_Log.RNAseq_statistics)), header=T, check.names = T, comment.char = "#", stringsAsFactors = F) 
+#require(RCurl)
+#RNAseq_statistics<- read.delim(textConnection(getURL(BRAINCODE2_Sequencing_Log.RNAseq_statistics)), header=T, check.names = T, comment.char = "#", stringsAsFactors = F) 
+library(googlesheets4)
+BRAINCODE2_Sequencing_Log.RNAseq_statistics="https://docs.google.com/spreadsheets/d/1McWI4zAtC1qIS4wiYMXvToTKrDkFXaiAqhfDPDHyNIA/edit#gid=1049148747"
+gs4_deauth()
+RNAseq_statistics<- read_sheet(BRAINCODE2_Sequencing_Log.RNAseq_statistics, sheet = "RNAseq_statistics", .name_repair = make.names) 
+RNAseq_statistics = filter(RNAseq_statistics, !grepl("^#", SOURCE_SAMPLE_ID)) # skip thg comment lines
 readsNum_million <- as.numeric(gsub(",","",RNAseq_statistics$total_mapped_reads))/10^6; names(readsNum_million) = RNAseq_statistics$SOURCE_SAMPLE_ID
 readsNum_million = readsNum_million[colnames(Merge_circexp_raw)]
 
@@ -109,6 +113,21 @@ length(unique(filter(Merge_circexp_raw_long_enriched.RM, sampleGroup3!="NN") %>%
 table(unique(Merge_circexp_raw_long_enriched.RM$ID) %in% rownames(Merge_circexp_raw_filtered))
 # FALSE  TRUE 
 # 37499  13401
+
+# Q: What about if we relax the enrichment cutoff (e.g. foldchange of RNase vs Mock at least 1)
+Merge_circexp_raw_long_enriched.RM.loose  = readRDS(file="Merge_circexp_raw_long_filterd.RM.loose.rds")
+length(unique(Merge_circexp_raw_long_enriched.RM.loose$ID))
+# [1] 267337
+## circRNAs enriched in brain
+length(unique(filter(Merge_circexp_raw_long_enriched.RM.loose, sampleGroup3!="NN") %>% pull(ID)))
+# [1] 267122  
+annotation_filtered_BC190=readRDS(file="Merge_circexplorer_BC190.filtered.annotation.bed14.rds")
+#Merge_circexp_raw_filtered=readRDS(file="Merge_circexplorer_BC197.filtered.rawcount.rds")
+#Merge_circexp_norm_filtered=readRDS(file="Merge_circexplorer_BC197.filtered.normRPM.rds")
+table(annotation_filtered_BC190$circType, annotation_filtered_BC190$ID %in% unique(Merge_circexp_raw_long_enriched.RM.loose$ID))
+# FALSE  TRUE
+# circRNA  8157 14057
+# ciRNA   85074  4131
 
 Merge_circexp_norm_filtered_and_enriched=Merge_circexp_norm_filtered[intersect(rownames(Merge_circexp_raw_filtered), Merge_circexp_raw_long_enriched.RM$ID), ]
 Merge_circexp_raw_filtered_and_enriched <- Merge_circexp_raw_filtered[rownames(Merge_circexp_norm_filtered_and_enriched), ]
@@ -194,6 +213,30 @@ annotation_filtered_enriched_BC190=filter(annotation_filtered_enriched, ID %in% 
 saveRDS(annotation_filtered_enriched_BC190, file="Merge_circexplorer_BC190.filtered.enriched.annotation.bed14.rds")
 dim(Merge_circexp_norm_filtered_and_enriched_BC190); dim(Merge_circexp_raw_filtered_and_enriched_BC190); dim(annotation_filtered_enriched_BC190)
 # [1] 11039  (validated set of circRNAs called in brain neuron)
+
+x=unique(rbind(annotation_filtered_enriched_BC190, annotation_filtered_BC190))
+table(x$circType, x$ID %in% annotation_filtered_enriched_BC190$ID)
+# FALSE  TRUE
+# circRNA 11748 10466
+# ciRNA   89037   168
+
+# TODO: discrepancy need to be figured out
+# > 'chr1_172011148_172100428' %in% as.character(annotation_filtered_enriched_BC190$ID)
+# [1] TRUE
+# > 'chr1_172011148_172100428' %in% as.character(annotation_filtered_BC190$ID)
+# [1] FALSE
+# 
+# > 'chr1_172011148_172100428' %in% as.character(rownames(Merge_circexp_raw_filtered_BC190))
+# [1] FALSE
+# > 'chr1_172011148_172100428' %in% as.character(rownames(Merge_circexp_raw_filtered))
+# [1] TRUE
+# > Merge_circexp_raw_filtered_and_enriched_BC190 = Merge_circexp_raw_filtered_and_enriched[rowSums(Merge_circexp_raw_filtered_and_enriched[,BC190])>0,BC190];
+# > 'chr1_172011148_172100428' %in% as.character(rownames(Merge_circexp_raw_filtered_and_enriched_BC190))
+# [1] TRUE
+# > 'chr1_172011148_172100428' %in% as.character(rownames(Merge_circexp_raw_filtered_and_enriched))
+# [1] TRUE
+# > 'chr1_172011148_172100428' %in% as.character(rownames(Merge_circexp_raw_filtered))
+# [1] TRUE
 
 #########################################
 ## Figure 1b: distribution of circRNAs supported by different number of reads
@@ -394,7 +437,7 @@ gmart = useEnsembl(biomart = "ensembl",version=75, dataset = "hsapiens_gene_ense
 listAttributes(gmart, page='homologs') %>% filter(grepl("dmelanogaster", name));
 listFilters(gmart);
 attributes = c("ensembl_gene_id",
-               "dmelanogaster_homolog_ensembl_gene","dmelanogaster_homolog_associated_gene_name",
+               "dmelanogaster_homolog_ensembl_gene", # "dmelanogaster_homolog_associated_gene_name" does not exist in the new version
                "dmelanogaster_homolog_orthology_type",
                "dmelanogaster_homolog_perc_id", "dmelanogaster_homolog_perc_id_r1")
 orth.human = getBM(attributes,mart = gmart,
@@ -409,22 +452,31 @@ orth.human = mutate(orth.human, ave_perc_id=dmelanogaster_homolog_perc_id+dmelan
 dim(orth.human);head(orth.human)
 total_human_genes_with_fly_orth = length(unique(orth.human$ensembl_gene_id))
 
-annotation_filtered_enriched$drosophila_orth_symbol=orth.human$dmelanogaster_homolog_associated_gene_name[match(gsub("\\..*","",annotation_filtered_enriched$geneID), orth.human$ensembl_gene_id)] # the unfound will be NA
+annotation_filtered_enriched$drosophila_orth_id=orth.human$dmelanogaster_homolog_ensembl_gene[match(gsub("\\..*","",annotation_filtered_enriched$geneID), orth.human$ensembl_gene_id)] # the unfound will be NA
 head(annotation_filtered_enriched)
-circRNA_fly_orth=table(select(annotation_filtered_enriched, geneID, geneName, geneType, drosophila_orth_symbol) %>% distinct() %>% filter(geneType=='protein_coding') %>% mutate(has_drosophila_orth=!is.na(drosophila_orth_symbol)) %>% pull(has_drosophila_orth))
+circRNA_fly_orth=table(select(annotation_filtered_enriched, geneID, geneName, geneType, drosophila_orth_id) %>% distinct() %>% filter(geneType=='protein_coding') %>% mutate(has_drosophila_orth=!is.na(drosophila_orth_id)) %>% pull(has_drosophila_orth))
 
 x0= rbind(circRNA_hostgene = circRNA_fly_orth, all_genes=c(total_human_genes-total_human_genes_with_fly_orth, total_human_genes_with_fly_orth))
 x=x0/rowSums(x0)
+
+pdf("~/projects/circRNA/results/Merge_circexplorer_BC190.filtered.enriched.conserved2fly.homolog.pdf", width = 4, height = 5)
+bp=barplot(t(x)[2:1,2:1], col=c('red','white'), ylab = "Proportion of genes conserved to Drosophila")
+mtext(at=bp,paste(x0[,2][2:1],"/",rowSums(x0)[2:1]))
+dev.off()
 
 # those fly genes with circRNAs
 # options(timeout=200); download.file("https://www.picb.ac.cn/rnomics/circpedia/static/download_cache/fly_dm6_All_circRNA.csv", destfile = "circpedia.fly_dm6_All_circRNA.csv")
 CIRCpedia2_fly = read.csv("https://www.picb.ac.cn/rnomics/circpedia/static/download_cache/fly_dm6_All_circRNA.csv", header = F)
 dim(CIRCpedia2_fly); head(CIRCpedia2_fly)
 
-pdf("~/projects/circRNA/results/Merge_circexplorer_BC190.filtered.enriched.conserved2fly.pdf", width = 4, height = 5)
-bp=barplot(t(x)[2:1,2:1], col=c('red','white'), ylab = "Proportion of genes conserved to Drosophila")
-mtext(at=bp,rowSums(x0)[2:1])
+gmart2 = useEnsembl(biomart = "ensembl",version=75, dataset = "dmelanogaster_gene_ensembl") # Ensembl v75 is GRCh37.p13, which is same as GENCODE v19
+flygenes = getBM(attributes=c("ensembl_gene_id","external_gene_id","flybasename_gene"),
+                 mart = gmart2,
+                 uniqueRows=TRUE)
+orth.human$dmelanogaster_homolog_associated_gene_name=flygenes$flybasename_gene[match(orth.human$dmelanogaster_homolog_ensembl_gene, flygenes$ensembl_gene_id)] 
+annotation_filtered_enriched$drosophila_orth_symbol=flygenes$flybasename_gene[match(annotation_filtered_enriched$drosophila_orth_id, flygenes$ensembl_gene_id)] 
 
+pdf("~/projects/circRNA/results/Merge_circexplorer_BC190.filtered.enriched.conserved2fly.CIRCpedia2.pdf", width = 4, height = 5)
 pie(table(orth.human$dmelanogaster_homolog_associated_gene_name %in% CIRCpedia2_fly$V3), labels = NA, col=c('red','darkred'), border='red', lwd=4, main="among all genes with fly orthology")
 pie(table(select(annotation_filtered_enriched, geneID, geneType, drosophila_orth_symbol) %>% distinct() %>% filter(geneType=='protein_coding', !is.na(drosophila_orth_symbol)) %>% pull(drosophila_orth_symbol) %in% CIRCpedia2_fly$V3), labels = NA, col=c('red','darkred'), border='red', lwd=4, main="among all circRNA host genes with fly orthology")
 dev.off()
@@ -674,14 +726,14 @@ par(pty="s"); plot(df1$sumReads, df2[df1$geneName], pch=16, cex=0.8, col='#00000
                    xlab="exon-circularized reads (circRNA only) per gene", ylab="linear reads", 
                    main="Correlation btw circular and linear reads")
 abline(a=0, b=1, col='red')
-mtext(paste("Pearson's r =", round(cortest$estimate, 2), "(p-value:", format.pval(cortest$p.value),")"))
+mtext(paste("spearman's rho =", round(cortest$estimate, 2), "(p-value:", format.pval(cortest$p.value),")"))
 
 cortest = cor.test(df11, df2[names(df11)],alternative = "two.sided", method = "spearman")
 par(pty="s"); plot(df11, df2[names(df11)], pch=16, cex=0.8, col='#00000066', log = 'xy', asp=1,
                    xlab="circular reads per gene", ylab="linear reads", 
                    main="Correlation btw circular and linear reads")
 abline(a=0, b=1, col='red')
-mtext(paste("Pearson's r =", round(cortest$estimate, 2), "(p-value:", format.pval(cortest$p.value),")"))
+mtext(paste("spearman's rho =", round(cortest$estimate, 2), "(p-value:", format.pval(cortest$p.value),")"))
 dev.off()
 
 ## ===============================================
@@ -977,28 +1029,42 @@ filter(annotation_filtered_enriched, geneName %in% synGO, geneName %in% unique(f
 ## ===============================================
 library(tidyverse)
 library(scales)
-setwd("~/projects/circRNA/data/backup_circExplorer2_v20190819/") 
-nS=read.table("Merge_circexplorer_BC.annotation.bed14.s3s5.gz", col.names=c("ID","type","sample","reads","count"), check.names = F, stringsAsFactors=F)
-nU=read.table("Merge_circexplorer_BC.annotation.bed14.u3u5.gz", col.names=c("ID","type","sample","reads","count"), check.names = F, stringsAsFactors=F)
-nC=read.table("Merge_circexplorer_BC.annotation.bed14.circReads.txt", header=T, check.names = F, row.names = 1, stringsAsFactors=F)
-# nL0=read.table("Merge_circexplorer_BC.annotation.bed14.sum_u3u5s3s5", header=T, check.names = F, row.names = 1, stringsAsFactors=F) # from bedtools coverage (which might be buggy)
-sample106=scan("~/neurogen/circRNA_seq_Rebeca_HC/BRAINCODE_circexp/BC.n106.samplelist",character())
-filtered_enriched_annotation=readRDS("Merge_circexplorer_BC106.filtered.enriched.annotation.bed14.rds")$ID; length(filtered_enriched_annotation)
+# OLD
+# setwd("~/projects/circRNA/data/backup_circExplorer2_v20190819/") 
+# nS=read.table("Merge_circexplorer_BC.annotation.bed14.s3s5.gz", col.names=c("ID","type","sample","reads","count"), check.names = F, stringsAsFactors=F)
+# nU=read.table("Merge_circexplorer_BC.annotation.bed14.u3u5.gz", col.names=c("ID","type","sample","reads","count"), check.names = F, stringsAsFactors=F)
+# nC=read.table("Merge_circexplorer_BC.annotation.bed14.circReads.txt", header=T, check.names = F, row.names = 1, stringsAsFactors=F)
+# # nL0=read.table("Merge_circexplorer_BC.annotation.bed14.sum_u3u5s3s5", header=T, check.names = F, row.names = 1, stringsAsFactors=F) # from bedtools coverage (which might be buggy)
+# sample106=scan("~/neurogen/circRNA_seq_Rebeca_HC/BRAINCODE_circexp/BC.n106.samplelist",character())
+# filtered_enriched_annotation=readRDS("Merge_circexplorer_BC106.filtered.enriched.annotation.bed14.rds")$ID; length(filtered_enriched_annotation)
+# nLw=unite(rbind(nS,nU), temp, sample, type, sep = "__") %>% select(ID, temp, reads) %>% spread(key=temp, value=reads, fill=0) %>% column_to_rownames(var = "ID")
+# nS3=select(nLw, contains("__s3")) %>% rename_all(.funs = funs(sub("__.*", "", .))); dim(nS3)
+# nS5=select(nLw, contains("__s5")) %>% rename_all(.funs = funs(sub("__.*", "", .))); dim(nS5)
+# nU3=select(nLw, contains("__u3")) %>% rename_all(.funs = funs(sub("__.*", "", .))); dim(nU3)
+# nU5=select(nLw, contains("__u5")) %>% rename_all(.funs = funs(sub("__.*", "", .))); dim(nU5)
+# common_Rows=Reduce(intersect, list(filtered_enriched_annotation, nS$ID, nU$ID, rownames(nC))); length(common_Rows)
+# common_Cols=Reduce(intersect, list(colnames(nC), sample106, nS$sample, nU$sample)); length(common_Cols)
+# nC=nC[common_Rows, sample106]; nS3=nS3[common_Rows, sample106]; nS5=nS5[common_Rows, sample106]; nU3=nU3[common_Rows, sample106]; nU5=nU5[common_Rows, sample106]
+# save(nC,nS3,nS5,nU3,nU5, file = "Merge_circexplorer_BC.annotation.bed14.nS3nS5nU3nU5.RData")
+# load("Merge_circexplorer_BC.annotation.bed14.nS3nS5nU3nU5.RData")
 
-nLw=unite(rbind(nS,nU), temp, sample, type, sep = "__") %>% select(ID, temp, reads) %>% spread(key=temp, value=reads, fill=0) %>% column_to_rownames(var = "ID")
+setwd("~/projects/circRNA/data/") 
+nS=read.table("Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.s3s5.gz", col.names=c("ID","type","sample","reads","count"), check.names = F, stringsAsFactors=F)
+nU=read.table("Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.u3u5.gz", col.names=c("ID","type","sample","reads","count"), check.names = F, stringsAsFactors=F)
+nC=readRDS("Merge_circexplorer_BC197.filtered.enriched.rawcount.rds")
+BC109=readRDS("Merge_circexplorer_BC109.filtered.enriched.normRPM.rds"); dim(BC109); 
+sample109=colnames(BC109); filtered_enriched_annotation=rownames(BC109)
+
+nLw=unite(rbind(nS,nU), temp, sample, type, sep = "__") %>% select(ID, temp, reads) %>% spread(key=temp, value=reads, fill=0, convert=T) %>% column_to_rownames(var = "ID")
 nS3=select(nLw, contains("__s3")) %>% rename_all(.funs = funs(sub("__.*", "", .))); dim(nS3)
 nS5=select(nLw, contains("__s5")) %>% rename_all(.funs = funs(sub("__.*", "", .))); dim(nS5)
 nU3=select(nLw, contains("__u3")) %>% rename_all(.funs = funs(sub("__.*", "", .))); dim(nU3)
 nU5=select(nLw, contains("__u5")) %>% rename_all(.funs = funs(sub("__.*", "", .))); dim(nU5)
-# nS3=filter(nS,type=='s3') %>% select(ID, sample, reads) %>% spread(key=sample, value=reads, fill = 0) %>% column_to_rownames(var = "ID")
-# nS5=filter(nS,type=='s5') %>% select(ID, sample, reads) %>% spread(key=sample, value=reads, fill = 0) %>% column_to_rownames(var = "ID")
-# nU3=filter(nU,type=='u3') %>% select(ID, sample, reads) %>% spread(key=sample, value=reads, fill = 0) %>% column_to_rownames(var = "ID")
-# nU5=filter(nU,type=='u5') %>% select(ID, sample, reads) %>% spread(key=sample, value=reads, fill = 0) %>% column_to_rownames(var = "ID")
 common_Rows=Reduce(intersect, list(filtered_enriched_annotation, nS$ID, nU$ID, rownames(nC))); length(common_Rows)
-common_Cols=Reduce(intersect, list(colnames(nC), sample106, nS$sample, nU$sample)); length(common_Cols)
-nC=nC[common_Rows, sample106]; nS3=nS3[common_Rows, sample106]; nS5=nS5[common_Rows, sample106]; nU3=nU3[common_Rows, sample106]; nU5=nU5[common_Rows, sample106]
-save(nC,nS3,nS5,nU3,nU5, file = "Merge_circexplorer_BC.annotation.bed14.nS3nS5nU3nU5.RData")
-load("Merge_circexplorer_BC.annotation.bed14.nS3nS5nU3nU5.RData")
+common_Cols=Reduce(intersect, list(colnames(nC), sample109, nS$sample, nU$sample)); length(common_Cols)
+nC=nC[common_Rows, sample109]; nS3=nS3[common_Rows, sample109]; nS5=nS5[common_Rows, sample109]; nU3=nU3[common_Rows, sample109]; nU5=nU5[common_Rows, sample109]
+save(nC,nS3,nS5,nU3,nU5, file = "Merge_circexplorer_BC109.annotation.bed14.nS3nS5nU3nU5.RData")
+#load("Merge_circexplorer_BC109.annotation.bed14.nS3nS5nU3nU5.RData")
 nL=nS3+nS5+nU3+nU5  # not very fair to use the sum
 ## 3/21/2019: We could change to use max: nL=max(nS3,nS5,nU3,nU5)
 # combine
@@ -1038,8 +1104,28 @@ mutate(nCL, rCL=nC/(nC+nL)) %>%
   labs(x="Cell types", y="Circular-to-linear fraction (ratio = nC/total reads)") +
   theme_bw() + 
   theme(legend.position='none')
-ggsave("../results/Merge_circexplorer_BC106.annotation.bed14.nC.vs.nL.boxplot.pdf", width=4.5, height = 4.5)
+ggsave("~/projects/circRNA/results/Merge_circexplorer_BC109.annotation.bed14.nC.vs.nL.boxplot.pdf", width=4.5, height = 4.5)
 
+# 3/8/2023: make a new supplementary panels for circERC1-1 (chr12_1399017_1519619) and circERC1-2 (chr12_1480998_1519619) analogous to what we have in Fig 2d and 2e (but only showing ERC1 data) 
+inner_join(x=rownames_to_column(nC, var = 'ID') %>% gather(key="sample",value=nC, contains("_")),
+           y=rownames_to_column(nL, var = 'ID') %>% gather(key="sample",value=nL, contains("_")),
+           by=c("ID","sample")) %>% 
+  filter(nC>0) %>% # Note the change: nL OR nC is non-zero
+  mutate(celltype=gsub(".*_.*_(.*)_.*_.*","\\1",sample)) %>% 
+  mutate(rCL=nC/(nC+nL)) %>%
+  filter(ID %in% c("chr12_1399017_1519619","chr12_1480998_1519619")) %>%
+  ggplot(aes(factor(celltype, levels = c("SNDA","TCPY","MCPY","FB","PBMC")),rCL)) + 
+  scale_y_log10(breaks = c(0,1e-5,1e-4,1e-3,0.01,.1,.5,1),labels = c(0,1e-5,1e-4,1e-3,0.01,.1,.5,1), limits=c(1e-5,1)) +
+  geom_boxplot(fill='white', width=0.4, outlier.shape = NA) + 
+  geom_point() + 
+  scale_fill_manual(name="Cell types",
+                    values=c("SNDA"="#F22A7B","TCPY" = "#3182bd","MCPY" = "#2659B2","FB" ="#BC9371","PBMC"="#D3CBCB"),
+                    drop=F) +
+  scale_x_discrete(drop=FALSE) +
+  labs(x="Cell types", y="Circular-to-linear fraction (ratio = nC/total reads)") +
+  theme_bw() + 
+  theme(legend.position='none')
+ggsave("~/projects/circRNA/results/Merge_circexplorer_BC109.annotation.bed14.nC.vs.nL.boxplot.ERC1.pdf", width=3, height = 3)
 
 # nC vs. nL scatter plot
 set.seed(1)

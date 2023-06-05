@@ -29,7 +29,7 @@ awk 'BEGIN{srand(1);} {printf "%06d\t%s\n", rand()*1000000, $0;}' /scratch/x/xd0
 ############################
 # control2: controls with matched numbers of exon and matched lenght of region
 ############################
-# make a fake BED file using exonCount as chr and exonLength as start, then find the cloest feature in the background for each circRNA. 
+# make a fake BED file using exonCount as chr and region length as start, then find the cloest feature in the background for each circRNA. 
 # choose the first hit from the ties
 # In that way, we match circRNAs with the closest combination of exons with the same number of exons and similar length of region 
 bedtools closest -a <(awk 'NR>1 {OFS="\t"; print "chr"$10,$3-$2,$3-$2+1,$0;}' $circRNA_annotation | cut -f1-17 | sortBed) -b <(awk 'NR>1{OFS="\t"; print "chr"$10,$3-$2,$3-$2+1,$0;}' $circRNA_annotation.background | sortBed) -t all > /scratch/x/xd010/$circRNA_annotation.matched2all

@@ -46,6 +46,7 @@ Merge_circexp_norm_filtered_and_enriched = select(Merge_circexp_norm_filtered_an
 Merge_circexp_norm_filtered_and_enriched = Merge_circexp_norm_filtered_and_enriched[rowMeans(Merge_circexp_norm_filtered_and_enriched)>0,]
 dim(Merge_circexp_norm_filtered_and_enriched); dim(annotation)
 # 11636   109
+saveRDS(Merge_circexp_norm_filtered_and_enriched, file="Merge_circexplorer_BC109.filtered.enriched.normRPM.rds")
 
 # 3 groups: SNDA, PY, and NN
 Merge_circexp_norm_filtered_and_enriched %>% rownames_to_column('gene') %>% gather(key = "sampleID", value='fpkm', -gene) %>%
@@ -60,6 +61,10 @@ Merge_circexp_norm_filtered_and_enriched %>% rownames_to_column('gene') %>% gath
 # two validated circRNAs from ERC1 (Note: mean of non-zero expression goes to Fig. 2e)
 Merge_circexp_raw_filtered_and_enriched=select(readRDS("Merge_circexplorer_BC197.filtered.enriched.rawcount.rds"), starts_with("HC_")) # only 109 HC remained
 write.table(Merge_circexp_raw_filtered_and_enriched, file="Merge_circexplorer_BC109.filtered.enriched.raw.xls", sep = "\t", quote = F, row.names = T, col.names = NA) 
+# two circRNAs from ERC1 (fig 2e)
+t(Merge_circexp_raw_filtered_and_enriched[c("chr12_1399017_1519619","chr12_1480998_1519619"),]) %>% as.data.frame() %>% 
+  rownames_to_column() %>% 
+  filter(chr12_1399017_1519619>0 | chr12_1480998_1519619>0)
 
 group3meancount = Merge_circexp_raw_filtered_and_enriched %>% mutate(gene=rownames(Merge_circexp_raw_filtered_and_enriched)) %>% melt(id.vars="gene", variable.name = "sampleID", value.name='readcount') %>%
   separate(sampleID, c("Dx", "subjectID","cellType","batch","rep"), sep = "_", remove=FALSE) %>%
@@ -71,8 +76,8 @@ group3meancount = Merge_circexp_raw_filtered_and_enriched %>% mutate(gene=rownam
   dcast(gene ~ cellType, value.var='meancount')
 
 # For fig 2e ERC1 and fig S6 APP genes
-filter(group3meancount, gene %in% c('chr12_1480998_1519619', 'chr21_27326903_27354790','chr21_27347382_27354790'))
-filter(group3mean, gene %in% c('chr12_1480998_1519619', 'chr21_27326903_27354790','chr21_27347382_27354790'))
+filter(group3meancount, gene %in% c('chr12_1399017_1519619', 'chr12_1480998_1519619', 'chr21_27326903_27354790','chr21_27347382_27354790'))
+filter(group3mean, gene %in% c('chr12_1399017_1519619','chr12_1480998_1519619', 'chr21_27326903_27354790','chr21_27347382_27354790'))
 
 ###########################################
 ## circRNA expressed in each cell #########
@@ -360,11 +365,14 @@ do.call("pheatmap", c(hm.parameters, width=3, height=5, filename="../results/Mer
 filtered_enriched_annotation=readRDS("Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.rds"); head(filtered_enriched_annotation); dim(filtered_enriched_annotation)
 groupmean_s3$hostgene=filtered_enriched_annotation$geneName[match(groupmean_s3$gene, filtered_enriched_annotation$ID)]
 groupmean_s3$hostgeneID=filtered_enriched_annotation$geneID[match(groupmean_s3$gene, filtered_enriched_annotation$ID)] 
+groupmean_s3$circType=filtered_enriched_annotation$circType[match(groupmean_s3$gene, filtered_enriched_annotation$ID)] 
 dim(groupmean_s3); groupmean_s3=filter(groupmean_s3, !is.na(hostgeneID)); dim(groupmean_s3) # 11636
 
 # circRNAs in the order of presence in above figure
 df_roworders = df3$gene[roworders]; head(df_roworders); length(df_roworders)  # n = 9694
 DF3=groupmean_s3[df_roworders,]; dim(DF3); head(DF3); table(DF3$Private_or_not)
+
+with(DF3, table(celltype,circType))
 
 # head(DF3)  ==> data frame for cell-specific circRNAs and their host genes
 #                           SNDA_spec   PY_spec   NN_spec                     gene         S  celltype         mean         m2sd Private_or_not hostgene         hostgeneID
@@ -375,9 +383,9 @@ DF3=groupmean_s3[df_roworders,]; dim(DF3); head(DF3); table(DF3$Private_or_not)
 # chr6_125330319_125379252 1.110223e-16 0.3062132 0.5797380 chr6_125330319_125379252 0.5797380       NN 0.0006942521 0.0006712448              1   RNF217 ENSG00000146373.12
 # chr1_201823722_201828122 0.000000e+00 0.1836853 0.7098156 chr1_201823722_201828122 0.7098156       NN 0.0020827564 0.0019134237              1     IPO9  ENSG00000198700.5
 
-# save DF3
-saveRDS(DF3, "Merge_circexplorer_BC109.cellspecific_heatmap.circRNA3.rds")
-saveRDS(groupmean_s3, "Merge_circexplorer_BC109.filtered.enriched.groupmean_s3.rds")
+# save the dataset with cell specificity
+saveRDS(DF3, "Merge_circexplorer_BC109.cellspecific_heatmap.circRNA3.rds") # only the private ones
+saveRDS(groupmean_s3, "Merge_circexplorer_BC109.filtered.enriched.groupmean_s3.rds") # all 11636 circRNAs
 #DF3=readRDS("Merge_circexplorer_BC109.cellspecific_heatmap.circRNA3.rds")
 #groupmean_s3=readRDS("Merge_circexplorer_BC109.filtered.enriched.groupmean_s3.rds")
 
@@ -439,10 +447,10 @@ private_circRNA_percent %>% rownames_to_column('celltype') %>% pivot_longer(cont
   theme_classic()
 ggsave("../results/Merge_circexplorer_BC109.cellspecific_heatmap5.genes3.endocytosis_OR_synapse.pdf", width=8, height = 6)
   
-# combined heatmap ==> Now go to Fig 3
+# combined heatmap ==> Now go to Fig3
 # (like Fig5 of https://www.cell.com/action/showPdf?pii=S2211-1247%2819%2931155-6)
 ORA=cbind(set="all",read.delim("../results/Merge_circexplorer_BC190.filtered.enriched.circRNA.all.ORA.all.xls", row.names = 1))
-#ORA=data.frame()
+#ORA=data.frame()5
 for(i in c("NN","PY","SNDA")) {
   message(paste("processing cell type",i,"..."));
   ora=read.delim(paste0("../results/Merge_circexplorer_BC109.cellspecific_heatmap5.genes3.",i,".ORA.all.xls"), row.names = 1)
@@ -451,7 +459,7 @@ for(i in c("NN","PY","SNDA")) {
 }
 head(ORA); dim(ORA)
 
-# TODO: save slimmed significant GO terms into Supplementary Table
+# TODO: save slimmed significant GO terms into Supplementary Table S5
 saveRDS(ORA, file = "Merge_circexplorer_BC109.all_and_cellspecific_hostgenes.ORA.rds")
 ORA %>% filter(FDR<0.05) %>% # dim()
   arrange(set, gene_set, FDR) %>%
@@ -832,9 +840,11 @@ sum(DF3$hostgene %in% ADgenes)
 ## cell-specificity of the host genes (in celltype3)
 ## ===========
 gene_fpkm=read.table("~/neurogen/rnaseq_PD/results/merged/genes.fpkm.cufflinks.allSamples.BCv2.uniq.xls", header = T, row.names = 1, stringsAsFactors = F, check.names = F); 
+#Merge_circexp_norm_filtered_and_enriched = readRDS(file="Merge_circexplorer_BC109.filtered.enriched.normRPM.rds")
 gene_fpkm=gene_fpkm[,colnames(Merge_circexp_norm_filtered_and_enriched)]; head(gene_fpkm); dim(gene_fpkm);
 matrix_fpkm_to_tpm <- function(fpkm) t(t(fpkm) / colSums(fpkm)) * 1e6  # Note: matrix / vector is by rows, transpose it if by columns
 gene_tpm = as.data.frame(matrix_fpkm_to_tpm(gene_fpkm))  ## convert FPKM to TPM, in order to have equal sum of expression for each sample
+#library(reshape2)
 gene_group5mean = gene_tpm %>% rownames_to_column(var = 'gene') %>% melt(id.vars="gene", variable.name = "sampleID", value.name='fpkm') %>%
   separate(sampleID, c("Dx", "subjectID","cellType","batch","rep"), sep = "_", remove=FALSE) %>%
   group_by(gene, cellType) %>%
@@ -852,22 +862,74 @@ gene_group3mean = gene_tpm %>% rownames_to_column(var = 'gene') %>% melt(id.vars
   dcast(gene ~ cellType, value.var='meanFPKM') 
 head(gene_group3mean)
 
-## background: cell-specific genes
-groupmean_to_specificity(gene_group3mean) %>% filter(Private_or_not==1) %>% group_by(celltype) %>% summarise(n=n())
+# all genes's cell specificity 
+gene_groupmean_s3 = groupmean_to_specificity(gene_group3mean)
+gene_groupmean_s3 %>% filter(Private_or_not==1) %>% group_by(celltype) %>% summarise(n=n())
 # 1 NN         523
 # 2 PY        2066
 # 3 SNDA      5431
 
-gene_group3mean_DF3 = gene_group3mean[match(unique(DF3$hostgeneID), gene_group3mean$gene),]
-gene_groupmean_s3_DF3 = groupmean_to_specificity(gene_group3mean_DF3)
+# save all genes's cell specificity 
+saveRDS(gene_groupmean_s3, "geneSpecificity.gene_group3mean.rds")
+gene_groupmean_s3 = readRDS("geneSpecificity.gene_group3mean.rds")
 
-## cell-specificity of circRNA VS. cell-specificity of hostgene
-DF3 = inner_join(DF3, gene_groupmean_s3_DF3,by = c("hostgeneID" = "gene"), suffix=c(".circRNA",".gene")); head(DF3)
-DF3 = mutate(DF3, celltype.specific.gene = ifelse(Private_or_not.gene==1, celltype.gene, "NS"))
-dim(DF3)
+## combine cell-specificity of circRNA VS. cell-specificity of hostgene
+circRNAs_and_genes__groupmean_s3 = left_join(groupmean_s3, gene_groupmean_s3,by = c("hostgeneID" = "gene"), suffix=c(".circRNA",".gene")) %>%
+  mutate(celltype.specific.gene = ifelse(Private_or_not.gene==1, celltype.gene, "NS"))
+saveRDS(circRNAs_and_genes__groupmean_s3, "Merge_circexplorer_BC109.filtered.enriched.circRNAs_and_genes__groupmean_s3.rds")
 
-## save the cell specificty table
+DF3 = filter(circRNAs_and_genes__groupmean_s3, Private_or_not.circRNA == 1); dim(DF3)
+
+## save the cell specificity table (Supplementary Table S3)
 write.table(DF3, file = "../results/Merge_circexplorer_BC109.cellspecificity.circRNA3.genes3.xls",sep="\t", na="", row.names=F)
+
+## 3/8/2023: ERC1 / ENSG00000082805.15 : show an inverse relation between neuron vs. non-neuron for the circRNAs vs. mRNAs 
+identical(names(gene_fpkm), names(Merge_circexp_norm_filtered_and_enriched))
+# circERC1-1 and circERC1-2 only
+rbind(gene_fpkm['ENSG00000082805.15',], Merge_circexp_norm_filtered_and_enriched[c("chr12_1399017_1519619","chr12_1480998_1519619"),]) %>% 
+  rownames_to_column(var = 'gene') %>% melt(id.vars="gene", variable.name = "sampleID", value.name='normalizedExpression') %>%
+  separate(sampleID, c("Dx", "subjectID","cellType","batch","rep"), sep = "_", remove=T) %>%
+  mutate(cellType=ifelse(cellType %in% c("TCPY","MCPY","SNDA"), "Neuronal","Non-neuronal"),
+         geneType=ifelse(grepl("ENSG",gene),"mRNA","circRNA")) %>% 
+  filter(geneType!="circRNA" | cellType!="Neuronal" | normalizedExpression!=0) %>% 
+  ggplot(aes(x=cellType,y=normalizedExpression+1e-3)) +
+  geom_boxplot(outlier.shape = NA) + geom_jitter(width = 0.2, colour = "darkgray", size =1) +
+  scale_y_log10() + ylab("Normalized expression (log scale)") + xlab("") +
+  theme(axis.text.x=element_text(angle = 45, hjust = 1)) +
+  facet_wrap(vars(geneType), scales = "free")
+ggsave("../results/circERC1_vs_ERC1.boxplot.pdf", width = 4, height = 4)
+
+# all circRNAs in ERC1 gene
+annotation = readRDS("Merge_circexplorer_BC197.filtered.enriched.annotation.bed14.rds")
+circERC1s = as.character(annotation$ID[annotation$geneName=="ERC1"]) # n =25
+rbind(gene_fpkm['ENSG00000082805.15',], Merge_circexp_norm_filtered_and_enriched[circERC1s,]) %>% 
+  filter_all(any_vars(. != 0)) %>%  # remove all 0 rows
+  rownames_to_column(var = 'gene') %>% melt(id.vars="gene", variable.name = "sampleID", value.name='normalizedExpression') %>%
+  separate(sampleID, c("Dx", "subjectID","cellType","batch","rep"), sep = "_", remove=T) %>%
+  mutate(cellType=ifelse(cellType %in% c("TCPY","MCPY","SNDA"), "Neuronal","Non-neuronal"),
+         geneType=ifelse(grepl("ENSG",gene),"mRNA","circRNA")) %>% 
+  filter(geneType!="circRNA" | cellType!="Neuronal" | normalizedExpression!=0) %>% 
+  ggplot(aes(x=cellType,y=normalizedExpression+1e-3)) +
+  geom_boxplot(outlier.shape = NA) + geom_jitter(width = 0.2, colour = "darkgray", size =1) +
+  scale_y_log10() +ylab("Normalized expression (log scale)") + xlab("") +
+  theme(axis.text.x=element_text(angle = 45, hjust = 1)) +
+  facet_wrap(vars(gene), scales = "free")
+ggsave("../results/circERC1all_vs_ERC1.boxplot.pdf", width = 10, height = 15)
+
+## 3/8/2023: make a new supplementary panels for circERC1-1 (chr12_1399017_1519619) and circERC1-2 (chr12_1480998_1519619) analogous to what we have in Fig 2d and 2e (but only showing ERC1 data) 
+#circRNAs_and_genes__groupmean_s3 = readRDS("Merge_circexplorer_BC109.filtered.enriched.circRNAs_and_genes__groupmean_s3.rds")
+circRNAs_and_genes__groupmean_s3 %>% mutate(x=match(paste0(celltype.circRNA,"_spec.gene"), colnames(circRNAs_and_genes__groupmean_s3))) %>%
+  filter(gene %in% c("chr12_1399017_1519619","chr12_1480998_1519619")) %>% 
+  mutate(S.circRNA.gene = circRNAs_and_genes__groupmean_s3[cbind(seq_along(x), x)]) %>% 
+  dplyr::select(celltype.circRNA, S.circRNA, S.circRNA.gene) %>% 
+  gather("circRNA_or_gene", "specificity_score", -1, convert = T) %>% 
+  mutate(circRNA_or_gene=as.factor(circRNA_or_gene), celltype.circRNA=as.factor(celltype.circRNA), specificity_score=as.numeric(specificity_score)) %>%
+  ggplot(aes(x=celltype.circRNA, y=specificity_score, fill=circRNA_or_gene)) + 
+  geom_boxplot(outlier.shape = NA, position=position_dodge(width = 1)) + geom_jitter(position=position_dodge(width = 1), colour = "darkgray", size =1) +
+  ylim(0,1) +
+  coord_flip() +
+  theme_bw()
+
 
 ## Any host genes for cell-specific circRNAs are private genes? None!
 for(i in c("NN","PY","SNDA")) {print(i); filter(DF3, celltype.circRNA==i, Private_or_not.gene==1) %>% dplyr::select(hostgene, celltype.gene) %>% distinct()%>% group_by(celltype.gene) %>% summarise(n=n()) %>% print()}
@@ -901,10 +963,31 @@ ggsave("../results/Merge_circexplorer_BC109.cellspecific_barplot++.hostgene.pdf"
 
 ## expression level of parental genes of specific circRNAs in each cell type
 
-
 ## spec.circRNA vs. spec.gene for the same cell type
+#DF3=read.table("../results/Merge_circexplorer_BC109.cellspecificity.circRNA3.genes3.xls",sep="\t", header = T)
 xx=DF3 %>% mutate(x=match(paste0(celltype.circRNA,"_spec.gene"), colnames(DF3))) 
 xx = xx %>% mutate(S.circRNA.gene = DF3[cbind(seq_along(x), x)]) %>% dplyr::select(celltype.circRNA, S.circRNA, S.circRNA.gene) %>% gather("circRNA_or_gene", "specificity_score", -1, convert = T) %>% mutate(circRNA_or_gene=as.factor(circRNA_or_gene), celltype.circRNA=as.factor(celltype.circRNA), specificity_score=as.numeric(specificity_score))
+ggplot(xx, aes(x=celltype.circRNA, y=specificity_score, fill=circRNA_or_gene)) + 
+  geom_violin(trim = T, scale = "width", position = position_dodge(width = .51)) + 
+  coord_flip() +
+  theme_bw()
+#geom_boxplot(col='white',width=0.05, outlier.shape = NA, position = position_dodge(width = .51)) 
+#geom_jitter(height = 0, width = 0.1)
+#geom_boxplot() +
+#geom_point(aes(fill = circRNA_or_gene), size = 5, shape = 21, position = position_jitterdodge())
+ggsave("../results/Merge_circexplorer_BC109.cellspecific_boxplot++.specificityscore.pdf", width=6, height = 2)
+
+## Q: reviewer's response: what about those host genes with only one circRNA?
+#DF3=read.table("../results/Merge_circexplorer_BC109.cellspecificity.circRNA3.genes3.xls",sep="\t", header = T)
+hostgene_with_singlecircRNA = readRDS("Merge_circexplorer_BC190.filtered.enriched.annotation.bed14.rds") %>% 
+  filter(circType=='circRNA') %>% group_by(geneName) %>% summarise(n=n()) %>% filter(n==1) %>% pull(geneName)
+length(hostgene_with_singlecircRNA)
+xx=DF3 %>% mutate(x=match(paste0(celltype.circRNA,"_spec.gene"), colnames(DF3))) %>%
+  filter(hostgene %in% hostgene_with_singlecircRNA)
+xx = xx %>% mutate(S.circRNA.gene = DF3[cbind(seq_along(x), x)]) %>% 
+  dplyr::select(celltype.circRNA, S.circRNA, S.circRNA.gene) %>% 
+  gather("circRNA_or_gene", "specificity_score", -1, convert = T) %>% 
+  mutate(circRNA_or_gene=as.factor(circRNA_or_gene), celltype.circRNA=as.factor(celltype.circRNA), specificity_score=as.numeric(specificity_score))
 ggplot(xx, aes(x=celltype.circRNA, y=specificity_score, fill=circRNA_or_gene)) + 
   geom_violin(trim = T, scale = "width", position = position_dodge(width = .51)) + 
   coord_flip() +
@@ -913,7 +996,7 @@ ggplot(xx, aes(x=celltype.circRNA, y=specificity_score, fill=circRNA_or_gene)) +
   #geom_jitter(height = 0, width = 0.1)
   #geom_boxplot() +
   #geom_point(aes(fill = circRNA_or_gene), size = 5, shape = 21, position = position_jitterdodge())
-ggsave("../results/Merge_circexplorer_BC109.cellspecific_boxplot++.specificityscore.pdf", width=6, height = 2)
+ggsave("../results/Merge_circexplorer_BC109.cellspecific_boxplot++.specificityscore.singlecircRNAgene.pdf", width=6, height = 2)
 
 ## heatmap of host genes of cell-specific circRNAs
 X=gene_group5mean[match(DF3$hostgeneID, gene_group5mean$gene),]; head(X); dim(X); 

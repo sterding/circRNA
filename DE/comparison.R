@@ -132,13 +132,14 @@ dev.off()
 ### =======================
 ## DE2gene_TCPY: AD vs. Braak
 ### =======================
-df1=read.table("DE2gene_TCPY/DEresult.DE2gene_TCPY.CONDITION_AD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
-df2=read.table("DE2gene_TCPY/DEresult.DE2gene_TCPY.Braak_Braak_stage.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df1=read.table("DE2gene_TCPY.backup/DEresult.DE2gene_TCPY.CONDITION_AD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df2=read.table("DE2gene_TCPY.backup/DEresult.DE2gene_TCPY.Braak_Braak_stage.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
 df1df2 = inner_join(rownames_to_column(df1) %>% filter(pvalue<=1) %>% select(1:8), 
                     rownames_to_column(df2) %>% filter(pvalue<=1) %>% select(1:13), 
                     by = 'rowname') %>%
   mutate(log2FoldChange.y=-1*log2FoldChange.y) # sign of fold change for continous variable?
 head(df1df2)
+dim(df1df2)
 
 pdf(file = "ADBraak.DE2gene.barplot.pdf", paper = 'US')
 
@@ -191,8 +192,8 @@ dev.off()
 ### =======================
 ## DE2gene_SNDA: PD vs. MUSS
 ### =======================
-df1=read.table("DE2gene_SNDA/DEresult.DE2gene_SNDA.CONDITION_PD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
-df2=read.table("DE2gene_SNDA/DEresult.DE2gene_SNDA.MUSS.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df1=read.table("DE2gene_SNDA.backup/DEresult.DE2gene_SNDA.CONDITION_PD_vs_HC.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
+df2=read.table("DE2gene_SNDA.backup/DEresult.DE2gene_SNDA.MUSS.xls.gz", stringsAsFactors = F, row.names = 1, header=T, sep = "\t")
 df1df2 = inner_join(rownames_to_column(df1) %>% filter(pvalue<=1) %>% select(1:8), 
                     rownames_to_column(df2) %>% filter(pvalue<=1) %>% select(1:13), 
                     by = 'rowname') # %>% mutate(log2FoldChange.y=-1*log2FoldChange.y) # sign of fold change for continous variable?

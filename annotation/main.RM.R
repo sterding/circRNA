@@ -1,8 +1,6 @@
 ## Main script to compare RNase R vs. mock treated samples
-library(dplyr)
 library(reshape2)
-library(tidyr)
-library(ggplot2)
+library(tidyverse)
 
 ## See ~/projects/circRNA/src/annotation/main.sh for how to generate the input files
 setwd("~/projects/circRNA/data/")
@@ -109,3 +107,12 @@ filter(Merge_circexp_raw_long_filterd, sampleGroup3!="NN") %>% pull(ID) %>% as.c
 # [1] 39875
 
 saveRDS(Merge_circexp_raw_long_filterd, file="Merge_circexp_raw_long_filterd.RM.rds")
+
+## relax version: foldchange of RNase vs Mock at least 1
+Merge_circexp_raw_long_filterd = filter(Merge_circexp_raw_long, R >= M) %>% 
+  filter(sampleID %in% c('HC_H02018_PBMC','HC_ND34770_FB','HC_TCKY1217_TC', 'HC_TCKY1247_TC','HC_MC3290_SN', 'HC_MD6326_MD')) %>% 
+  mutate(sampleGroup = sub(".*_(.*)","\\1",sampleID)) %>%
+  mutate(sampleGroup3 = ifelse(grepl('FB|PBMC', sampleGroup),'NN', ifelse(grepl('SN|MB', sampleGroup),'SN','PY'))) %>%
+  arrange(sampleGroup3) %>% distinct() 
+saveRDS(Merge_circexp_raw_long_filterd, file="Merge_circexp_raw_long_filterd.RM.loose.rds")
+

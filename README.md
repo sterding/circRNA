@@ -90,6 +90,7 @@ Some prototype codes for circRNA QTL analysis (incl. eQTL, splicing QTL, circula
 - bedtools (2.26.0)
 - circExplorer (2.3.0)
 
+The scripts were tested on Linux and MacOS, but not on Windows. 
 
 ## Maintainence and contribution
 This code is developed and maintained by Dr Xianjun Dong. Please email to xdong AT bwh.harvard.edu for questions and comments.
